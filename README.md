@@ -1,6 +1,8 @@
 # Roommate Chore List — Pay Per Chore, IOUs & Venmo
 
-A full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
+A proposed full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
+
+> **Status: Proposed design only.** This repository currently contains only this README and `.gitignore`; it does not include the Compose configuration, server, client, or seed data. The setup commands, demo credentials, and API endpoints below describe intended functionality and are not currently runnable.
 
 ## Architecture
 
