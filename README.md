@@ -1,6 +1,8 @@
 # Roommate Chore List — Pay Per Chore, IOUs & Venmo
 
-A full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
+A proposal for a full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
+
+> **This repository contains a design proposal only, not a runnable application.** It currently has no application source code, Compose configuration, database migrations, or seed data. The architecture, features, setup steps, credentials, and API endpoints below describe the proposed implementation.
 
 ## Architecture
 
@@ -23,7 +25,9 @@ Vue 3 Client (Vite, Pinia, Tailwind)
 - **AI-Powered Suggestions** — Gemini AI suggests new chores and analyzes fairness of chore distribution
 - **Payment Reminders** — Schedule and track payment reminders
 
-## Quick Start
+## Proposed Setup (Not Runnable)
+
+The following steps are for the planned application and cannot be run with the contents of this repository.
 
 ### Prerequisites
 
@@ -67,16 +71,16 @@ Add your Gemini API key to `server/.env`:
 GEMINI_API_KEY=your-api-key-here
 ```
 
-## Demo Credentials
+## Planned Demo Credentials
 
-Seed data creates two users:
+The planned seed data would create two users; these credentials are not available in a running application:
 
 | Email | Password |
 |-------|----------|
 | alice@example.com | password123 |
 | bob@example.com | password123 |
 
-## API Endpoints
+## Proposed API Endpoints
 
 ### Auth
 - `POST /api/auth/register` — Register new user
