@@ -1,0 +1,32 @@
+{
+  "name": "roomate-chore-list-pay-per-chore-ious-venmo-server",
+  "version": "1.0.0",
+  "description": "Express API Server for Roommate Chore List with Pay-Per-Chore IOU tracking",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "migrate": "knex migrate:latest",
+    "migrate:rollback": "knex migrate:rollback",
+    "seed": "knex seed:run",
+    "db:setup": "knex migrate:latest && knex seed:run"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.2.1",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "allowScripts": {
+    "bcrypt@5.1.1": true
+  }
+}
