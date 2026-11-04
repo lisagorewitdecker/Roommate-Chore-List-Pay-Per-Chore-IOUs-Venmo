@@ -116,7 +116,7 @@ const ChoreController = {
           });
 
         // Create ledger transaction if chore has a cost and is assigned
-        if (chore.cost_cents > 0 && chore.assigned_to && chore.created_by) {
+        if (chore.cost_cents > 0 && chore.assigned_to && chore.created_by && chore.assigned_to !== chore.created_by) {
           await trx('ledger_transactions').insert({
             from_user: chore.assigned_to,
             to_user: chore.created_by,
