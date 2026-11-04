@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: roommate-chore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: roommate_chore_db
+      POSTGRES_USER: roommate_user
+      POSTGRES_PASSWORD: roommate_pass_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roommate_user -d roommate_chore_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
