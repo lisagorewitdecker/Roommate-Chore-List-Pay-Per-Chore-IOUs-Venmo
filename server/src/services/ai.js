@@ -67,10 +67,7 @@ Focus on practical, fair chores that promote a clean and harmonious living envir
       const userId = req.user.id;
       const users = await db('users').select('id', 'name');
       const chores = await db('chores')
-        .select('title', 'cost_cents', 'assigned_to', 'is_completed', 'frequency')
-        .leftJoin('users as assignee', 'chores.assigned_to', 'assignee.id')
-        .pluck('chores')
-        .map(row => row);
+        .select('title', 'cost_cents', 'assigned_to', 'is_completed', 'frequency');
 
       const ledger = await db('ledger_transactions')
         .select(
