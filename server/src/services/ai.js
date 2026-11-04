@@ -91,7 +91,7 @@ You are a fair chore and payment analysis assistant for roommates.
 Roommates: ${users.map(u => u.name).join(', ')}
 
 Current chore assignments:
-${chores.map(c => `- ${c.title}: $${(c.cost_cents / 100).toFixed(2)}, ${c.frequency}, ${c.is_completed ? 'completed' : 'pending'}`).join('\n')}
+${chores.map(c => `- ${c.title} (assigned to ${users.find(u => u.id === c.assigned_to)?.name || 'unassigned'}): $${(c.cost_cents / 100).toFixed(2)}, ${c.frequency}, ${c.is_completed ? 'completed' : 'pending'}`).join('\n')}
 
 Pending IOUs:
 ${ledger.map(t => `- ${t.from_name} owes ${t.to_name}: $${(t.amount_cents / 100).toFixed(2)}`).join('\n')}
