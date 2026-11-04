@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS ious (
   debtor_id UUID NOT NULL REFERENCES users(id),
   creditor_id UUID NOT NULL REFERENCES users(id),
   amount_cents INT NOT NULL CHECK (amount_cents > 0),
+  source_chore_id UUID REFERENCES chores(id) ON DELETE SET NULL,
+  source_supply_id UUID REFERENCES cleaning_supplies(id) ON DELETE SET NULL,
   description VARCHAR(255),
   status VARCHAR(10) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
   created_by UUID NOT NULL REFERENCES users(id),
