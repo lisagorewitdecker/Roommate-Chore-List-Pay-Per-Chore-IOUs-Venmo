@@ -1,53 +1,46 @@
+const SOURCE_COLUMNS = Object.freeze({
+  chore: 'source_chore_id',
+  supply: 'source_supply_id'
+});
+
 async function createHouseholdExpenseIous(client, {
   householdId,
   creditorId,
   amountCents,
   description,
   sourceType,
-  beneficiaryId
+  sourceId,
+  beneficiaryId = null
 }) {
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return [];
+  const sourceColumn = SOURCE_COLUMNS[sourceType];
+  if (!sourceColumn) throw new Error('Unsupported household expense source');
 
-  const members = await client.query(
-    'SELECT id FROM users WHERE household_id = $1 ORDER BY id',
+  const membersResult = await client.query(
+    'SELECT id FROM users WHERE household_id = $1 ORDER BY id FOR SHARE',
     [householdId]
   );
-  const memberIds = members.rows.map(({ id }) => id);
+  const memberIds = membersResult.rows.map(member => member.id);
+  if (!memberIds.includes(creditorId)) throw new Error('Expense creditor must belong to the household');
 
-  if (beneficiaryId) {
-    if (!memberIds.includes(beneficiaryId)) {
-      throw new Error('Expense beneficiary does not belong to the household');
-    }
-    if (beneficiaryId === creditorId) return [];
+  let shares;
+  if (beneficiaryId !== null) {
+    if (!memberIds.includes(beneficiaryId)) throw new Error('Expense beneficiary must belong to the household');
+    shares = [[beneficiaryId, amountCents]];
+  } else {
+    const baseShare = Math.floor(amountCents / memberIds.length);
+    const remainder = amountCents % memberIds.length;
+    shares = memberIds.map((memberId, index) => [memberId, baseShare + (index < remainder ? 1 : 0)]);
+  }
 
-    return client.query(
-      `INSERT INTO ledger_transactions (from_user, to_user, amount_cents, type, description, status)
-       VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
-      [beneficiaryId, creditorId, amountCents, `${sourceType}_expense`, description]
+  for (const [debtorId, shareCents] of shares) {
+    if (debtorId === creditorId || shareCents === 0) continue;
+    await client.query(
+      `INSERT INTO ious
+        (household_id, debtor_id, creditor_id, amount_cents, description, created_by, ${sourceColumn})
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [householdId, debtorId, creditorId, shareCents, description, creditorId, sourceId]
     );
   }
-
-  if (!memberIds.includes(creditorId)) {
-    throw new Error('Expense creditor does not belong to the household');
-  }
-
-  const share = Math.floor(amountCents / memberIds.length);
-  const remainder = amountCents % memberIds.length;
-  const transactions = [];
-
-  for (const [index, memberId] of memberIds.entries()) {
-    if (memberId === creditorId) continue;
-    const memberShare = share + (index < remainder ? 1 : 0);
-    if (memberShare === 0) continue;
-
-    transactions.push(await client.query(
-      `INSERT INTO ledger_transactions (from_user, to_user, amount_cents, type, description, status)
-       VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
-      [memberId, creditorId, memberShare, `${sourceType}_expense`, description]
-    ));
-  }
-
-  return transactions;
 }
 
-exports.createHouseholdExpenseIous = createHouseholdExpenseIous;
+module.exports = { createHouseholdExpenseIous };
