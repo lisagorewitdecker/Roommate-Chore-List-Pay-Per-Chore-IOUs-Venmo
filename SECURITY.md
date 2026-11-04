@@ -14,8 +14,12 @@ currently being supported with security updates.
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+Report suspected vulnerabilities privately through [GitHub's Report a
+vulnerability page](https://github.com/lisagorewitdecker/Roommate-Chore-List-Pay-Per-Chore-IOUs-Venmo/security/advisories/new).
+Do not report vulnerabilities in public issues.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Maintainers will acknowledge reports within 5 business days and provide an
+initial assessment within 10 business days. While investigating, they will
+provide an update at least every 30 days. If a report is accepted, maintainers
+will coordinate a fix and disclosure timeline with the reporter. If it is
+declined, they will explain why.
