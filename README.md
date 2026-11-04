@@ -2,7 +2,7 @@
 
 A proposed full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
 
-> **Status: Proposed design only.** This repository currently contains only this README and `.gitignore`; it does not include the Compose configuration, server, client, or seed data. The setup commands, demo credentials, and API endpoints below describe intended functionality and are not currently runnable.
+> **Status: Scaffold/proposal only.** This repository contains project configuration and a PostgreSQL Compose file, but no server or client packages, application features, migrations, or seed data. The setup commands, demo credentials, and API endpoints below describe proposed functionality and are not currently runnable.
 
 ## Architecture
 
