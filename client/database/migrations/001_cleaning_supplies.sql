@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS cleaning_supplies (
   price_cents INT CHECK (price_cents IS NULL OR price_cents >= 0),
   assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  beneficiary_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  purchased_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  actual_price_cents INT,
   purchased_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
