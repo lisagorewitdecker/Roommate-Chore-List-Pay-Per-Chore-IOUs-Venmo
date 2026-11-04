@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS ious (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
   debtor_id UUID NOT NULL REFERENCES users(id),
   creditor_id UUID NOT NULL REFERENCES users(id),
