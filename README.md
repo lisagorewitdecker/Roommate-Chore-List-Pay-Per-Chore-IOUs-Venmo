@@ -29,7 +29,7 @@ Vue 3 Client (Vite, Pinia, Tailwind)
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js matching `^22.22.2 || ^24.15.0 || >=26.0.0` for the full app
 - Docker & Docker Compose
 - (Optional) Google Gemini API key for AI features
 
@@ -40,6 +40,10 @@ docker compose up -d
 ```
 
 ### 2. Backend Setup
+
+The backend requires Node.js 20 or >=22. It uses bcrypt 6 to avoid the legacy
+glob dependency chain and a scoped nodemon override for patched minimatch 11
+(nodemon's declared range otherwise stops at vulnerable minimatch 10).
 
 ```bash
 cd server
