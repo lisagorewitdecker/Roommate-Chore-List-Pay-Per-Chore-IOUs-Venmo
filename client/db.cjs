@@ -2,9 +2,19 @@ const { Pool } = require('pg');
 const path = require('node:path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
+const ssl =
+  process.env.NODE_ENV === 'production'
+    ? {
+        rejectUnauthorized: true,
+        ...(process.env.DATABASE_CA_CERT
+          ? { ca: process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n') }
+          : {})
+      }
+    : false;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000
