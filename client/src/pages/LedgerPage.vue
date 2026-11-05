@@ -62,8 +62,9 @@
           <button type="submit" :disabled="ledgerStore.loading || !ledgerStore.members.length" class="rounded-md bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-50">
             Create IOU
           </button>
-          <p v-if="!ledgerStore.members.length && !ledgerStore.loading" class="mt-2 text-sm text-gray-500">
-            Add another roommate to your household before recording an IOU.
+          <p v-if="!ledgerStore.members.length && !ledgerStore.loading" class="mt-2 text-sm text-amber-600">
+            You're the only member of this household. IOUs require at least two roommates.
+            <router-link to="/" class="underline font-medium">Go to the home page</router-link> to copy your invite code and share it with a roommate.
           </p>
         </div>
       </form>

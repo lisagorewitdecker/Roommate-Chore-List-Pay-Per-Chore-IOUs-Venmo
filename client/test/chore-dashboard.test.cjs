@@ -19,8 +19,6 @@ function loadComponent(vue) {
       `const {${bindings.replace(/\s+as\s+/g, ':')}} = global.__choreDashboardVue;`)
     .replace(/import\s+\{\s*useChoreStore\s*\}\s+from\s+['"][^'"]+['"];?/g,
       'const { useChoreStore } = global.__choreDashboardModules;')
-    .replace(/import\s+\{\s*useAuthStore\s*\}\s+from\s+['"][^'"]+['"];?/g,
-      'const { useAuthStore } = global.__choreDashboardModules;')
     .replace(/import\s+api\s+from\s+['"][^'"]+['"];?/g,
       'const api = global.__choreDashboardModules.api;')
     .replace(/export default\s+/, 'global.__choreDashboardComponent = ');
@@ -87,7 +85,7 @@ function findInput(root, id) {
 async function mountDashboard({ chores = [], fetchError, fetchErrors = [], createError, apiPost } = {}) {
   const vue = await import('vue');
   const state = vue.reactive({ chores, loading: false, error: null });
-  const calls = { fetch: 0, create: [], claim: [], complete: [], pay: [] };
+  const calls = { fetch: 0, create: [], status: [], pay: [] };
   state.fetchChores = async () => {
     calls.fetch += 1;
     if (fetchErrors[calls.fetch - 1]) throw fetchErrors[calls.fetch - 1];
@@ -99,20 +97,14 @@ async function mountDashboard({ chores = [], fetchError, fetchErrors = [], creat
     if (createError) throw createError;
     state.chores.unshift({ id: 'new-chore', status: 'open', ...payload });
   };
-  state.claimChore = async id => {
-    calls.claim.push(id);
+  state.updateStatus = async (id, status) => {
+    calls.status.push([id, status]);
     const chore = state.chores.find(item => item.id === id);
-    if (chore) chore.assigned_to = { id: 'current-user' };
-  };
-  state.completeChore = async id => {
-    calls.complete.push(id);
-    const chore = state.chores.find(item => item.id === id);
-    if (chore) chore.status = 'completed';
+    if (chore) chore.status = status;
   };
   state.payChore = async id => calls.pay.push(id);
   global.__choreDashboardModules = {
     useChoreStore: () => state,
-    useAuthStore: () => ({ user: { id: 'current-user' } }),
     api: { post: (...args) => apiPost(...args) }
   };
 
@@ -135,12 +127,10 @@ function input(inputNode, value, vue) {
   return vue.nextTick();
 }
 
-test('offers unassigned chores for pickup and completion only to the assigned roommate', async () => {
+test('fetches chores on mount and presents status-specific board actions', async () => {
   const { root, calls, vue } = await mountDashboard({
     chores: [
-      { id: 'open', title: 'Vacuum', price_cents: 500, status: 'open', created_by: 'another-user' },
-      { id: 'assigned', title: 'Mop', price_cents: 600, status: 'open', assigned_to: { id: 'current-user' } },
-      { id: 'other-assigned', title: 'Dust', price_cents: 400, status: 'open', assigned_to: { id: 'another-user' } },
+      { id: 'open', title: 'Vacuum', price_cents: 500, status: 'open' },
       { id: 'completed', title: 'Dishes', price_cents: 750, status: 'completed' },
       { id: 'paid', title: 'Laundry', price_cents: 1000, status: 'verified_paid' }
     ]
@@ -149,16 +139,10 @@ test('offers unassigned chores for pickup and completion only to the assigned ro
   assert.equal(calls.fetch, 1);
   assert.match(textContent(root), /Roommate Chore Bounty/);
   assert.match(textContent(root), /\$5\.00/);
-  assert.ok(findButton(root, 'Pick up'));
   assert.ok(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Mark Complete'));
   assert.ok(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Settle & Pay $7.50'));
   assert.equal(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Settle & Pay $10.00'), null);
-  await click(findButton(root, 'Pick up'), vue);
   await click(findButton(root, 'Mark Complete'), vue);
-  await click(findButton(root, 'Mark Complete'), vue);
-  assert.deepEqual(calls.claim, ['open']);
-  assert.deepEqual(calls.complete, ['open', 'assigned']);
-  assert.equal(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Mark Complete'), null);
 });
 
 test('AI estimate updates the reward and create submits cents then resets the modal', async () => {
@@ -228,23 +212,21 @@ test('creation failures keep the modal and entered form values available for ret
 test('payment and status actions call the store and action failures are shown', async () => {
   const { root, calls, vue } = await mountDashboard({
     chores: [
-      { id: 'open', title: 'Vacuum', price_cents: 500, status: 'open', assigned_to: { id: 'current-user' } },
+      { id: 'open', title: 'Vacuum', price_cents: 500, status: 'open' },
       { id: 'completed', title: 'Dishes', price_cents: 750, status: 'completed' }
     ]
   });
 
   await click(findButton(root, 'Mark Complete'), vue);
   await click(findButton(root, 'Settle & Pay $7.50'), vue);
-  assert.deepEqual(calls.complete, ['open']);
+  assert.deepEqual(calls.status, [['open', 'completed']]);
   assert.deepEqual(calls.pay, ['completed']);
 
   const failed = await mountDashboard({
     chores: [{ id: 'open', title: 'Vacuum', price_cents: 500, status: 'open' }],
     apiPost: async () => ({ data: {} })
   });
-  failed.state.chores[0].assigned_to = { id: 'current-user' };
-  await failed.vue.nextTick();
-  failed.state.completeChore = async () => { throw new Error('Status update rejected'); };
+  failed.state.updateStatus = async () => { throw new Error('Status update rejected'); };
   await click(findButton(failed.root, 'Mark Complete'), failed.vue);
   assert.match(textContent(failed.root), /Status update rejected/);
 });

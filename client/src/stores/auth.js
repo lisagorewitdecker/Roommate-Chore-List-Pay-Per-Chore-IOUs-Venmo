@@ -1,9 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import api from '../utils/api.js';
-import { useChoreStore } from './choreStore.js';
-import { useSupplyStore } from './supplyStore.js';
-import { useLedgerStore } from './ledger.js';
+import api from '../utils/api';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'));
@@ -43,6 +40,8 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = data.user;
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      // Fetch full profile to get the household invite code
+      await fetchMe();
       return data;
     } catch (err) {
       error.value = err.response?.data?.error || 'Registration failed';
@@ -65,9 +64,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
-    useChoreStore().reset();
-    useSupplyStore().reset();
-    useLedgerStore().reset();
     token.value = null;
     user.value = null;
     localStorage.removeItem('token');

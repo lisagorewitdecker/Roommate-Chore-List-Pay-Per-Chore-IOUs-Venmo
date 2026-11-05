@@ -12,7 +12,39 @@ const { createSupplyController } = require('./controllers/supplyController.cjs')
 const { createLedgerController } = require('./controllers/ledgerController.cjs');
 const { createAuthRoutes } = require('./routes/authRoutes.cjs');
 
-function createApp({ pool: paymentPool = pool, aiClientFactory } = {}) {
+function createRateLimiter({ limit = 5, windowMs = 15 * 60 * 1000 } = {}) {
+  const requestsByIp = new Map();
+
+  return (req, res, next) => {
+    const now = Date.now();
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    let requestWindow = requestsByIp.get(ip);
+    if (!requestWindow || requestWindow.resetAt <= now) {
+      requestWindow = { count: 0, resetAt: now + windowMs };
+      requestsByIp.set(ip, requestWindow);
+    }
+
+    requestWindow.count += 1;
+    if (requestWindow.count > limit) {
+      res.set('Retry-After', String(Math.ceil((requestWindow.resetAt - now) / 1000)));
+      return res.status(429).json({ error: 'Too many password reset requests. Please try again later.' });
+    }
+
+    if (requestsByIp.size > 10000) {
+      for (const [key, value] of requestsByIp) {
+        if (value.resetAt <= now) requestsByIp.delete(key);
+      }
+    }
+    return next();
+  };
+}
+
+function createApp({
+  pool: paymentPool = pool,
+  aiClientFactory,
+  sendPasswordResetEmail,
+  passwordResetEmailConfigured
+} = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(cors({
@@ -20,7 +52,11 @@ function createApp({ pool: paymentPool = pool, aiClientFactory } = {}) {
     credentials: true
   }));
   app.use(express.json({ limit: '16kb' }));
-  app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool)));
+  app.use('/api/auth/password-reset', createRateLimiter());
+  app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool, {
+    sendPasswordResetEmail,
+    passwordResetEmailConfigured
+  })));
   const choreController = createChoreController(paymentPool);
   app.get('/api/chores', auth, choreController.list);
   app.post('/api/chores', auth, choreController.create);
