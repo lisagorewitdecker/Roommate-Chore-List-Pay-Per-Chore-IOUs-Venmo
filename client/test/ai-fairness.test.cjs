@@ -26,6 +26,7 @@ async function requestFairness({
   modelText = '{"fairness_score":7,"observations":["Roommate 1 has more assigned chores."],"recommendations":["Rotate future assignments."]}',
   providerError,
   apiKey = 'test-gemini-key',
+  geminiConsent = true,
   authorization = true,
   databaseError
 } = {}) {
@@ -68,7 +69,9 @@ async function requestFairness({
     const token = jwt.sign({ id: 'test-user', household_id: 'stale-household' }, secret);
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/ai/fair-split`, {
       method: 'POST',
+      body: JSON.stringify({ geminiConsent }),
       headers: {
+        'Content-Type': 'application/json',
         ...(authorization ? { Authorization: `Bearer ${token}` } : {})
       }
     });
@@ -104,6 +107,15 @@ test('requires authentication before reading household data', async () => {
 
   assert.equal(response.status, 401);
   assert.deepEqual(body, { error: 'Missing or malformed token' });
+  assert.equal(queries.length, 0);
+  assert.equal(modelRequests.length, 0);
+});
+
+test('requires explicit consent before reading household data or calling Gemini', async () => {
+  const { response, body, queries, modelRequests } = await requestFairness({ geminiConsent: false });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(body, { error: 'Consent to share chore data with Gemini is required' });
   assert.equal(queries.length, 0);
   assert.equal(modelRequests.length, 0);
 });

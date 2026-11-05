@@ -582,7 +582,11 @@ test('separate app instances retain their own CORS, pool, and AI client dependen
               Origin: instance.origin,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ title: 'Clean kitchen', description: 'Wipe surfaces' })
+            body: JSON.stringify({
+              title: 'Clean kitchen',
+              description: 'Wipe surfaces',
+              geminiConsent: true
+            })
           });
           assert.equal(estimateResponse.status, 200);
           assert.equal(estimateResponse.headers.get('access-control-allow-origin'), instance.origin);
