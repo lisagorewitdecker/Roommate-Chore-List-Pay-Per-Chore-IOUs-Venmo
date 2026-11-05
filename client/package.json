@@ -1,0 +1,35 @@
+{
+  "name": "roomate-chore-list-pay-per-chore-ious-venmo-client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "node --watch server.cjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.cjs",
+    "test": "node test/run-tests.cjs",
+    "test:integration": "node test/run-tests.cjs integration",
+    "test:unit": "node test/run-tests.cjs unit"
+  },
+  "dependencies": {
+    "axios": "^1.6.5",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^4.22.3",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.3",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "vite": "8.3.3"
+  }
+}
