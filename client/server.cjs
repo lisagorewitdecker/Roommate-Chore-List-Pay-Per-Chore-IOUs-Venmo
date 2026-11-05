@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const pool = require('./db.cjs');
 const auth = require('./middleware/auth.js');
 const { createAuthController } = require('./controllers/authController.cjs');
@@ -18,6 +19,10 @@ function createApp({ pool: paymentPool = pool, aiClientFactory } = {}) {
   app.use(cors({
     origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
     credentials: true
+  }));
+  app.use('/api', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100
   }));
   app.use(express.json({ limit: '16kb' }));
   app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool)));

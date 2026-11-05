@@ -153,6 +153,26 @@ test('malformed JSON receives a client error response', async () => {
   }
 });
 
+test('API routes are rate-limited without affecting health checks', async () => {
+  const server = await listen(createApp({ pool: {} }));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    for (let request = 0; request < 100; request += 1) {
+      const response = await fetch(`${baseUrl}/api/auth/me`);
+      assert.equal(response.status, 401);
+    }
+
+    const limitedResponse = await fetch(`${baseUrl}/api/auth/me`);
+    assert.equal(limitedResponse.status, 429);
+
+    const healthResponse = await fetch(`${baseUrl}/health`);
+    assert.equal(healthResponse.status, 200);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
 test('all mounted protected routes reject missing and invalid tokens before calling dependencies', async () => {
   await withJwtSecret('server-route-test-secret', async () => {
     let poolCalls = 0;
