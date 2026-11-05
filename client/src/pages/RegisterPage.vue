@@ -92,7 +92,7 @@ const inviteCode = ref('');
 
 async function handleRegister() {
   try {
-    await authStore.register(name.value, email.value, password.value);
+    await authStore.register(name.value, email.value, password.value, householdName.value, inviteCode.value);
     router.push('/');
   } catch (err) {
     // error is stored in authStore
