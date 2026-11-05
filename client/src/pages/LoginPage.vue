@@ -7,8 +7,9 @@
 
       <form @submit.prevent="handleLogin" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
+            id="login-email"
             v-model="email"
             type="email"
             required
@@ -17,8 +18,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label for="login-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
           <input
+            id="login-password"
             v-model="password"
             type="password"
             required
