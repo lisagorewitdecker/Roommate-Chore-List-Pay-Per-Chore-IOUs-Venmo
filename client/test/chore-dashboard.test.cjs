@@ -157,8 +157,16 @@ test('AI estimate updates the reward and create submits cents then resets the mo
   await click(findButton(root, '+ Post New Chore'), vue);
   await input(findInput(root, 'chore-title'), '  Clean fridge  ', vue);
   await input(findInput(root, 'chore-description'), 'Scrub shelves', vue);
-  await click(findButton(root, 'Run AI Estimator'), vue);
-  assert.deepEqual(requests, [['/ai/estimate-price', { title: 'Clean fridge', description: 'Scrub shelves' }]]);
+  const estimateButton = findButton(root, 'Run AI Estimator');
+  assert.equal(estimateButton.props.disabled, true);
+  findInput(root, 'ai-gemini-consent').props.onChange({ target: { checked: true } });
+  await vue.nextTick();
+  await click(estimateButton, vue);
+  assert.deepEqual(requests, [['/ai/estimate-price', {
+    title: 'Clean fridge',
+    description: 'Scrub shelves',
+    geminiConsent: true
+  }]]);
   assert.equal(findInput(root, 'chore-reward').props.value, '12.50');
   assert.match(textContent(root), /Medium task: Several steps/);
   await input(findInput(root, 'chore-reward'), '13.37', vue);
@@ -185,6 +193,8 @@ test('AI estimator errors are displayed and invalid prices are not applied', asy
   });
   await click(findButton(root, '+ Post New Chore'), vue);
   await input(findInput(root, 'chore-title'), 'Clean fridge', vue);
+  findInput(root, 'ai-gemini-consent').props.onChange({ target: { checked: true } });
+  await vue.nextTick();
   await click(findButton(root, 'Run AI Estimator'), vue);
   assert.match(textContent(root), /Pricing service unavailable/);
   assert.equal(findInput(root, 'chore-reward').props.value, '5.00');

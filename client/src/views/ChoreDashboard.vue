@@ -122,12 +122,25 @@
             <button
               type="button"
               @click="runAiPricing"
-              :disabled="aiLoading || !newChore.title.trim()"
+              :disabled="!geminiConsent || aiLoading || !newChore.title.trim()"
               class="text-xs text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded disabled:opacity-50"
             >
               {{ aiLoading ? 'Calculating...' : 'Run AI Estimator' }}
             </button>
           </div>
+          <p class="text-xs text-blue-900">
+            The chore title and description will be sent to Google Gemini, a third-party service. Avoid including sensitive personal information.
+          </p>
+          <label class="flex items-start gap-2 text-xs text-blue-900">
+            <input
+              id="ai-gemini-consent"
+              type="checkbox"
+              :checked="geminiConsent"
+              @change="geminiConsent = $event.target.checked"
+              class="mt-0.5"
+            />
+            <span>I consent to sharing this title and description with Gemini for this estimate.</span>
+          </label>
           <p v-if="aiError" role="alert" class="text-xs text-red-700">{{ aiError }}</p>
           <p v-if="aiInsight" class="text-xs text-blue-800 italic">{{ aiInsight }}</p>
         </div>
@@ -177,6 +190,7 @@ import api from '../utils/api.js';
 const store = useChoreStore();
 const showCreateModal = ref(false);
 const aiLoading = ref(false);
+const geminiConsent = ref(false);
 const creating = ref(false);
 const loadError = ref(null);
 const actionError = ref(null);
@@ -210,6 +224,7 @@ function openCreateModal() {
 function resetForm() {
   aiRequestId.value += 1;
   aiLoading.value = false;
+  geminiConsent.value = false;
   newChore.value = { title: '', description: '', price_cents: 500, assigned_to: '' };
   aiInsight.value = null;
   aiError.value = null;
@@ -233,14 +248,18 @@ function updateReward(event) {
 async function runAiPricing() {
   const title = newChore.value.title.trim();
   const description = newChore.value.description;
-  if (!title || aiLoading.value) return;
+  if (!title || !geminiConsent.value || aiLoading.value) return;
 
   const requestId = ++aiRequestId.value;
   aiLoading.value = true;
   aiError.value = null;
   aiInsight.value = null;
   try {
-    const { data } = await api.post('/ai/estimate-price', { title, description });
+    const { data } = await api.post('/ai/estimate-price', {
+      title,
+      description,
+      geminiConsent: geminiConsent.value
+    });
     if (requestId !== aiRequestId.value || title !== newChore.value.title.trim() || description !== newChore.value.description) {
       return;
     }
