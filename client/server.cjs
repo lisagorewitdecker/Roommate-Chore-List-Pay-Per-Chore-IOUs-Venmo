@@ -12,7 +12,12 @@ const { createSupplyController } = require('./controllers/supplyController.cjs')
 const { createLedgerController } = require('./controllers/ledgerController.cjs');
 const { createAuthRoutes } = require('./routes/authRoutes.cjs');
 
-function createApp({ pool: paymentPool = pool, aiClientFactory } = {}) {
+function createApp({
+  pool: paymentPool = pool,
+  aiClientFactory,
+  sendPasswordResetEmail,
+  passwordResetEmailConfigured
+} = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(cors({
@@ -20,7 +25,10 @@ function createApp({ pool: paymentPool = pool, aiClientFactory } = {}) {
     credentials: true
   }));
   app.use(express.json({ limit: '16kb' }));
-  app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool)));
+  app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool, {
+    sendPasswordResetEmail,
+    passwordResetEmailConfigured
+  })));
   const choreController = createChoreController(paymentPool);
   app.get('/api/chores', auth, choreController.list);
   app.post('/api/chores', auth, choreController.create);

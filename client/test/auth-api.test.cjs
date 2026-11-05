@@ -251,13 +251,13 @@ test('registration validates input before acquiring a database client', async ()
     { body: { name: 'Name', email: 'name@example.com', password: 'password123', invite_code: 'X'.repeat(13) }, error: 'Invite code is invalid' }
   ];
 
-  await withApi(pool, async baseUrl => {
-    for (const item of cases) {
+  for (const item of cases) {
+    await withApi(pool, async baseUrl => {
       const { response, body } = await post(baseUrl, '/api/auth/register', item.body);
       assert.equal(response.status, 400);
       assert.deepEqual(body, { error: item.error });
-    }
-  });
+    });
+  }
 
   assert.equal(pool.connectCount, 0);
 });
@@ -471,6 +471,46 @@ test('registration rolls back on database and token-signing failures', async () 
   assert.equal(signingFailurePool.releaseCount, 1);
   assert.equal(signingFailurePool.users.length, 0);
   assert.equal(signingFailurePool.households.length, 0);
+});
+
+test('registration and login have independent rate limits and do not reach the database after blocking', async () => {
+  const pool = new MemoryPool();
+
+  await withApi(pool, async baseUrl => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const result = await post(baseUrl, '/api/auth/register', {
+        name: 'Roommate', email: `roommate-${attempt}@example.com`, password: 'password123'
+      });
+      assert.equal(result.response.status, 201);
+    }
+
+    const connectCountAfterRegistrations = pool.connectCount;
+    const registrationLimit = await post(baseUrl, '/api/auth/register', {
+      name: 'Roommate', email: 'blocked@example.com', password: 'password123'
+    });
+    assert.equal(registrationLimit.response.status, 429);
+    assert.deepEqual(registrationLimit.body, { error: 'Too many registration attempts. Please try again later.' });
+    assert.equal(registrationLimit.response.headers.get('ratelimit-limit'), '5');
+    assert.match(registrationLimit.response.headers.get('retry-after'), /^\d+$/);
+    assert.equal(pool.connectCount, connectCountAfterRegistrations);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const result = await post(baseUrl, '/api/auth/login', {
+        email: 'missing@example.com', password: 'password123'
+      });
+      assert.equal(result.response.status, 401);
+    }
+
+    const queryCountAfterLogins = pool.queryLog.length;
+    const loginLimit = await post(baseUrl, '/api/auth/login', {
+      email: 'missing@example.com', password: 'password123'
+    });
+    assert.equal(loginLimit.response.status, 429);
+    assert.deepEqual(loginLimit.body, { error: 'Too many login attempts. Please try again later.' });
+    assert.equal(loginLimit.response.headers.get('ratelimit-limit'), '5');
+    assert.match(loginLimit.response.headers.get('retry-after'), /^\d+$/);
+    assert.equal(pool.queryLog.length, queryCountAfterLogins);
+  });
 });
 
 test('health endpoint responds and exposes the configured client origin through CORS', async () => {
