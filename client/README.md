@@ -12,11 +12,15 @@ The authenticated user's ID is read from the JWT, not from the request body. For
 
 ## AI Pricing API
 
-`POST /api/ai/estimate-price` requires a Bearer JWT signed with `JWT_SECRET` and a JSON body containing a non-empty `title` and an optional string `description`. It uses Gemini to return `price_cents`, `difficulty` (`Easy`, `Medium`, or `Hard`), and `reasoning`. Configure `GEMINI_API_KEY` in the API server environment to enable estimates; the default model is `gemini-3.8-flash`, and `GEMINI_MODEL` can override it. Missing credentials and provider errors include configuration guidance without exposing the API key.
+`POST /api/ai/estimate-price` requires a Bearer JWT signed with `JWT_SECRET` and a JSON body containing a non-empty `title` and an optional string `description`. It uses Gemini to return `price_cents`, `difficulty` (`Easy`, `Medium`, or `Hard`), and `reasoning`. The submitted `title` and `description` are sent to the external Gemini provider to generate the estimate. Configure `GEMINI_API_KEY` in the API server environment to enable estimates; the default model is `gemini-3.8-flash`, and `GEMINI_MODEL` can override it. Missing credentials and provider errors include configuration guidance without exposing the API key.
 
 `POST /api/ai/fair-split` requires the same authentication and analyzes chore assignment counts and total prices for the signed-in user's current household. The API sends only anonymized aggregate counts and values to Gemini, not roommate names, email addresses, or chore descriptions. The returned score, observations, and recommendations are a limited snapshot of recorded assignments, not a definitive fairness judgment. At least one chore must be assigned to a household member.
 
-`POST /api/ai/suggest-chores` requires the same authentication and suggests chores using up to 20 existing household chore titles and anonymized assigned chore counts per roommate. Chore titles may contain personal information; names, email addresses, and descriptions are not sent. Suggestions include a proposed whole-cent cost and informational frequency; frequency is not saved as a recurring schedule. Households without existing chores can still request suggestions.
+`POST /api/ai/suggest-chores` requires the same authentication and suggests chores using up to 20 existing household chore titles and anonymized assigned chore counts per roommate. Chore titles are sent to Gemini and may contain personal information; names, email addresses, and descriptions are not sent. Suggestions include a proposed whole-cent cost and informational frequency; frequency is not saved as a recurring schedule. Households without existing chores can still request suggestions.
+
+### AI data sharing and consent
+
+AI endpoints cross a trust boundary to a third-party model provider (Gemini). Enable these routes only when your deployment and household policy explicitly allow third-party processing of user-provided chore text. Obtain informed user consent before use, and avoid submitting sensitive personal data in chore titles/descriptions. Operationally, treat AI features as opt-in (for example, behind an explicit deployment flag such as `AI_FEATURES_ENABLED=true`) and keep them disabled by default unless this consent and policy requirement is met.
 
 ## Chore API
 
