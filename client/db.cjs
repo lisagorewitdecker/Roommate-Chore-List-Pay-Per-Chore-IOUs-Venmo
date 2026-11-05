@@ -5,7 +5,10 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production'
-    ? (process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT } : {})
+    ? {
+        rejectUnauthorized: true,
+        ...(process.env.DATABASE_CA_CERT ? { ca: process.env.DATABASE_CA_CERT } : {})
+      }
     : false,
   max: 20,
   idleTimeoutMillis: 30000,

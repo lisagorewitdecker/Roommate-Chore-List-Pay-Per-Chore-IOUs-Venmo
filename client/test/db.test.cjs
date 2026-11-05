@@ -72,12 +72,27 @@ test('configures the development pool without SSL and applies pool limits', () =
   assert.equal(options.connectionTimeoutMillis, 2000);
 });
 
-test('enables the configured SSL options in production', () => {
+test('enables certificate-verified SSL in production', () => {
   const options = readPoolOptions({
     env: { NODE_ENV: 'production', DATABASE_URL: 'postgres://prod.example/app' }
   });
 
-  assert.deepEqual(options.ssl, { rejectUnauthorized: false });
+  assert.deepEqual(options.ssl, { rejectUnauthorized: true });
+});
+
+test('uses the configured CA certificate in production', () => {
+  const options = readPoolOptions({
+    env: {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgres://prod.example/app',
+      DATABASE_CA_CERT: 'provider CA certificate'
+    }
+  });
+
+  assert.deepEqual(options.ssl, {
+    rejectUnauthorized: true,
+    ca: 'provider CA certificate'
+  });
 });
 
 test('loads DATABASE_URL and NODE_ENV from the module .env outside the working directory', () => {
@@ -87,7 +102,7 @@ test('loads DATABASE_URL and NODE_ENV from the module .env outside the working d
   });
 
   assert.equal(options.connectionString, 'postgres://module.example/app');
-  assert.deepEqual(options.ssl, { rejectUnauthorized: false });
+  assert.deepEqual(options.ssl, { rejectUnauthorized: true });
 });
 
 test('keeps existing environment variables ahead of .env values', () => {
