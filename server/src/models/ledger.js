@@ -88,12 +88,7 @@ const LedgerController = {
   async markPaid(req, res) {
     try {
       const { id } = req.params;
-      const transaction = await db('ledger_transactions')
-        .where({ id })
-        .where(function () {
-          this.where('from_user', req.user.id).orWhere('to_user', req.user.id);
-        })
-        .first();
+      const transaction = await db('ledger_transactions').where({ id }).first();
 
       if (!transaction) {
         return res.status(404).json({ error: 'Transaction not found.' });

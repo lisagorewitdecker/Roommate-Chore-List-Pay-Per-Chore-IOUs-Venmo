@@ -39,9 +39,6 @@ const ReminderController = {
 
       const transaction = await db('ledger_transactions')
         .where({ id: transaction_id, status: 'pending' })
-        .where(function () {
-          this.where('from_user', req.user.id).orWhere('to_user', req.user.id);
-        })
         .first();
 
       if (!transaction) {
@@ -71,13 +68,7 @@ const ReminderController = {
       // Find due reminders
       const dueReminders = await db('payment_reminders')
         .where('status', 'scheduled')
-        .where('scheduled_for', '<=', now)
-        .whereExists(function () {
-          this.select(db.raw('1'))
-            .from('ledger_transactions')
-            .whereColumn('ledger_transactions.id', 'payment_reminders.transaction_id')
-            .where('ledger_transactions.status', 'pending');
-        });
+        .where('scheduled_for', '<=', now);
 
       // Mark them as sent
       const ids = dueReminders.map(r => r.id);

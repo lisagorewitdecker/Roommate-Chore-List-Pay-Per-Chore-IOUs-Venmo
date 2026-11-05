@@ -1,3 +1,4 @@
+const db = require('../src/config/database');
 const bcrypt = require('bcrypt');
 
 exports.seed = async function (knex) {

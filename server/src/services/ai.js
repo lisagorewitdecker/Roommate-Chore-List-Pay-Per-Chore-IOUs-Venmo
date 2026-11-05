@@ -67,7 +67,10 @@ Focus on practical, fair chores that promote a clean and harmonious living envir
       const userId = req.user.id;
       const users = await db('users').select('id', 'name');
       const chores = await db('chores')
-        .select('title', 'cost_cents', 'assigned_to', 'is_completed', 'frequency');
+        .select('title', 'cost_cents', 'assigned_to', 'is_completed', 'frequency')
+        .leftJoin('users as assignee', 'chores.assigned_to', 'assignee.id')
+        .pluck('chores')
+        .map(row => row);
 
       const ledger = await db('ledger_transactions')
         .select(
@@ -88,7 +91,7 @@ You are a fair chore and payment analysis assistant for roommates.
 Roommates: ${users.map(u => u.name).join(', ')}
 
 Current chore assignments:
-${chores.map(c => `- ${c.title} (assigned to ${users.find(u => u.id === c.assigned_to)?.name || 'unassigned'}): $${(c.cost_cents / 100).toFixed(2)}, ${c.frequency}, ${c.is_completed ? 'completed' : 'pending'}`).join('\n')}
+${chores.map(c => `- ${c.title}: $${(c.cost_cents / 100).toFixed(2)}, ${c.frequency}, ${c.is_completed ? 'completed' : 'pending'}`).join('\n')}
 
 Pending IOUs:
 ${ledger.map(t => `- ${t.from_name} owes ${t.to_name}: $${(t.amount_cents / 100).toFixed(2)}`).join('\n')}
