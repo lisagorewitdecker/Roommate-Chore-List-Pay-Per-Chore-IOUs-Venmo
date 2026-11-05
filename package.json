@@ -1,32 +1,32 @@
 {
-  "name": "untitled",
-  "version": "0.0.0",
+  "name": "roomate-chore-list-pay-per-chore-ious",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
-    "preview": "vite preview",
-    "build-only": "vite build",
-    "type-check": "vue-tsc --build"
+    "dev": "npm --prefix client run dev",
+    "dev:api": "npm --prefix client run dev:api",
+    "build": "npm --prefix client run build",
+    "preview": "npm --prefix client run preview",
+    "test": "npm --prefix client test",
+    "test:integration": "npm --prefix client run test:integration",
+    "test:unit": "npm --prefix client run test:unit"
   },
   "dependencies": {
     "vue": "^3.5.42"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.5",
-    "@types/node": "^26.6.6",
+    "@types/node": "^24.13.4",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
-    "autoprefixer": "^10.4.22",
     "npm-run-all2": "^9.0.3",
-    "tailwindcss": "^3.4.17",
-    "typescript": "~7.0.2",
+    "typescript": "~6.0.0",
     "vite": "^8.2.2",
     "vite-plugin-vue-devtools": "^8.2.1",
     "vue-tsc": "^3.3.11"
   },
   "engines": {
-    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+    "node": "^22.18.0 || >=24.12.0"
   }
 }

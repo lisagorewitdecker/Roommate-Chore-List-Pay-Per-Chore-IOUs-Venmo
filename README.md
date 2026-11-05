@@ -1,8 +1,6 @@
 # Roommate Chore List — Pay Per Chore, IOUs & Venmo
 
-A proposed full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
-
-> **Status: Scaffold/proposal only.** This repository contains project configuration and a PostgreSQL Compose file, but no server or client packages, application features, migrations, or seed data. The setup commands, demo credentials, and API endpoints below describe proposed functionality and are not currently runnable.
+A full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
 
 ## Architecture
 
@@ -29,7 +27,7 @@ Vue 3 Client (Vite, Pinia, Tailwind)
 
 ### Prerequisites
 
-- Node.js matching `^22.22.2 || ^24.15.0 || >=26.0.0` for the full app
+- Node.js 18+
 - Docker & Docker Compose
 - (Optional) Google Gemini API key for AI features
 
@@ -40,10 +38,6 @@ docker compose up -d
 ```
 
 ### 2. Backend Setup
-
-The backend requires Node.js 20 or >=22. It uses bcrypt 6 to avoid the legacy
-glob dependency chain and a scoped nodemon override for patched minimatch 11
-(nodemon's declared range otherwise stops at vulnerable minimatch 10).
 
 ```bash
 cd server
