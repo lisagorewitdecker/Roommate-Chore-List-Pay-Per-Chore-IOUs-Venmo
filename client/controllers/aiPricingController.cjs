@@ -14,7 +14,8 @@ function createGeminiClient({ apiKey, fetchImpl = globalThis.fetch } = {}) {
               'Content-Type': 'application/json',
               'x-goog-api-key': apiKey
             },
-            body: JSON.stringify({ contents, generationConfig })
+            body: JSON.stringify({ contents, generationConfig }),
+            signal: AbortSignal.timeout(30000)
           }
         );
 
@@ -88,7 +89,7 @@ function createAiPricingController(aiClientFactory = createGeminiClient) {
     } catch {
       return res.status(502).json({ error: 'Unable to estimate chore price' });
     }
-    const price = estimate.suggested_price_usd;
+    const price = estimate?.suggested_price_usd;
     const priceCents = Math.round(price * 100);
 
     if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0 ||

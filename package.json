@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "npm --prefix client start",
     "dev": "npm --prefix client run dev",
     "dev:api": "npm --prefix client run dev:api",
     "build": "npm --prefix client run build",

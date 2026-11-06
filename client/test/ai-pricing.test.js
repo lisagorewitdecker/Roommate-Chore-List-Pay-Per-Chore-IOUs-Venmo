@@ -136,6 +136,9 @@ test('reports missing Gemini configuration without calling the provider', async 
 test('rejects malformed or out-of-range model output', async () => {
   for (const modelText of [
     'not json',
+    'null',
+    '[]',
+    '42',
     '{"suggested_price_usd": 100, "difficulty_level": "Hard", "reasoning": "Too expensive."}',
     '{"suggested_price_usd": 10, "difficulty_level": "Extreme", "reasoning": "Unknown category."}',
     '{"suggested_price_usd": 0, "difficulty_level": "Easy", "reasoning": "Free."}',
@@ -192,10 +195,22 @@ test('sends a structured request through the Gemini REST adapter', async () => {
 
   assert.equal(capturedUrl, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent');
   assert.equal(capturedOptions.method, 'POST');
+  assert.ok(capturedOptions.signal instanceof AbortSignal);
   assert.equal(capturedOptions.headers['x-goog-api-key'], 'test-gemini-key');
   assert.deepEqual(JSON.parse(capturedOptions.body), {
     contents: request.contents,
     generationConfig: request.generationConfig
   });
   assert.deepEqual(result, { text: modelText });
+});
+
+test('propagates provider timeouts so callers can display an actionable error', async () => {
+  const client = createGeminiClient({
+    apiKey: 'test-gemini-key',
+    fetchImpl: async (url, { signal }) => {
+      assert.ok(signal instanceof AbortSignal);
+      throw new DOMException('Request timed out', 'TimeoutError');
+    }
+  });
+  await assert.rejects(client.models.generateContent({ contents: [] }), { name: 'TimeoutError' });
 });
