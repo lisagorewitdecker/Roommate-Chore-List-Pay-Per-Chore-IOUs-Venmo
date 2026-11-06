@@ -127,6 +127,22 @@ test('password reset requests send a hashed, expiring token without revealing wh
   }, { sendPasswordResetEmail, passwordResetEmailConfigured: () => true });
 });
 
+test('password reset requests return the generic response when email delivery fails', async () => {
+  const pool = new PasswordResetMemoryPool([makeUser()]);
+  const sendPasswordResetEmail = async () => {
+    throw new Error('SMTP delivery failed');
+  };
+
+  await withApi(pool, async baseUrl => {
+    const known = await post(baseUrl, '/api/auth/password-reset/request', { email: 'alex@example.com' });
+    const unknown = await post(baseUrl, '/api/auth/password-reset/request', { email: 'unknown@example.com' });
+
+    assert.equal(known.response.status, 200);
+    assert.deepEqual(known.body, unknown.body);
+    assert.equal(known.body.message, 'If an account exists for that email, a password reset link has been sent.');
+  }, { sendPasswordResetEmail, passwordResetEmailConfigured: () => true });
+});
+
 test('password reset validates tokens and passwords, consumes the token, and permits login with the new password', async () => {
   const user = makeUser();
   const expiredTokenHash = createHash('sha256').update('b'.repeat(64)).digest('hex');

@@ -226,7 +226,12 @@ function createAuthController(pool, {
         const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
         const resetUrl = new URL('/reset-password', `${clientOrigin.replace(/\/$/, '')}/`);
         resetUrl.searchParams.set('token', token);
-        await sendPasswordResetEmail({ to: user.email, resetUrl: resetUrl.toString() });
+        try {
+          void Promise.resolve(sendPasswordResetEmail({ to: user.email, resetUrl: resetUrl.toString() }))
+            .catch(error => console.error('Password reset email delivery failed:', error));
+        } catch (error) {
+          console.error('Password reset email delivery failed:', error);
+        }
       }
 
       return res.status(200).json({ message: PASSWORD_RESET_MESSAGE });
