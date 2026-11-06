@@ -165,6 +165,7 @@
               Complete
             </button>
             <button
+              v-if="chore.status === 'open' && chore.created_by === authStore.user?.id"
               @click="handleDelete(chore.id)"
               class="px-3 py-1 text-sm text-red-600 border border-red-600 rounded-lg hover:bg-red-50"
             >
