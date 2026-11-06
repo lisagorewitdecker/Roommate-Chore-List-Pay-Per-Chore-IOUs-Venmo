@@ -83,6 +83,16 @@ export const useLedgerStore = defineStore('ledger', () => {
     return `$${((Number.isFinite(amount) ? amount : 0) / 100).toFixed(2)}`;
   }
 
+  function reset() {
+    transactions.value = [];
+    ious.value = [];
+    members.value = [];
+    venmoUsername.value = '';
+    summary.value = null;
+    loading.value = false;
+    error.value = null;
+  }
+
   return {
     transactions,
     ious,
@@ -91,6 +101,7 @@ export const useLedgerStore = defineStore('ledger', () => {
     summary,
     loading,
     error,
+    reset,
     fetchLedger,
     markPaid,
     createIOU,

@@ -194,10 +194,17 @@ export const useChoreStore = defineStore('chores', () => {
     }
   }
 
+  function reset() {
+    chores.value = [];
+    loading.value = false;
+    error.value = null;
+  }
+
   return {
     chores,
     loading,
     error,
+    reset,
     fetchChores,
     getChore,
     createChore,

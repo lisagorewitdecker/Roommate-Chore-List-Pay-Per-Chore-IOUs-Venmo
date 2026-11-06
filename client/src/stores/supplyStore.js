@@ -68,5 +68,12 @@ export const useSupplyStore = defineStore('supplies', () => {
     }
   }
 
-  return { supplies, members, loading, error, fetchSupplies, createSupply, updateSupply, markPurchased };
+  function reset() {
+    supplies.value = [];
+    members.value = [];
+    loading.value = false;
+    error.value = null;
+  }
+
+  return { supplies, members, loading, error, reset, fetchSupplies, createSupply, updateSupply, markPurchased };
 });
