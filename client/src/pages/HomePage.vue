@@ -53,16 +53,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 
 const authStore = useAuthStore();
 const copied = ref(false);
 
-const inviteCode = authStore.user?.household?.invite_code || '';
+const inviteCode = computed(() => authStore.user?.household?.invite_code || '');
 
 function copyInviteCode() {
-  navigator.clipboard.writeText(inviteCode).then(() => {
+  navigator.clipboard.writeText(inviteCode.value).then(() => {
     copied.value = true;
     setTimeout(() => { copied.value = false; }, 2000);
   });
