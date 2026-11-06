@@ -29,168 +29,214 @@ export const useChoreStore = defineStore('chores', () => {
   const chores = ref([]);
   const loading = ref(false);
   const error = ref(null);
+  let session = 0;
+
+  function isCurrentSession(requestSession) {
+    return requestSession === session;
+  }
+
+  function reset() {
+    session += 1;
+    chores.value = [];
+    loading.value = false;
+    error.value = null;
+  }
 
   async function fetchChores() {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.get('/chores');
       const choreList = Array.isArray(data) ? data : data?.chores;
-      chores.value = Array.isArray(choreList) ? choreList : [];
+      if (isCurrentSession(requestSession)) {
+        chores.value = Array.isArray(choreList) ? choreList : [];
+      }
     } catch (err) {
-      error.value = choreErrorMessage(err, 'Failed to load chores');
+      if (isCurrentSession(requestSession)) {
+        error.value = choreErrorMessage(err, 'Failed to load chores');
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function createChore(choreData) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.post('/chores', choreData);
       const chore = unwrapChore(data);
-      chores.value.unshift(chore);
+      if (isCurrentSession(requestSession)) chores.value.unshift(chore);
       return chore;
     } catch (err) {
-      error.value = choreErrorMessage(err, 'Failed to create chore');
+      if (isCurrentSession(requestSession)) {
+        error.value = choreErrorMessage(err, 'Failed to create chore');
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function getChore(id) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.get(`/chores/${id}`);
       return unwrapChore(data);
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to fetch chore';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to fetch chore';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function updateChore(id, choreData) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.patch(`/chores/${id}`, choreData);
       const chore = unwrapChore(data);
       const index = chores.value.findIndex(c => c.id === id);
-      if (index !== -1) {
+      if (isCurrentSession(requestSession) && index !== -1) {
         chores.value[index] = chore;
       }
       return chore;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to update chore';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to update chore';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function updateStatus(id, status) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.patch(`/chores/${id}`, { status });
       const chore = unwrapChore(data);
       const index = chores.value.findIndex(c => c.id === id);
-      if (index !== -1) {
+      if (isCurrentSession(requestSession) && index !== -1) {
         chores.value[index] = chore;
       }
       return chore;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to update chore status';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to update chore status';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function completeChore(id) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.patch(`/chores/${id}/complete`);
       const chore = unwrapChore(data);
       const index = chores.value.findIndex(c => c.id === id);
-      if (index !== -1) {
+      if (isCurrentSession(requestSession) && index !== -1) {
         chores.value[index] = chore;
       }
       return chore;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to complete chore';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to complete chore';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function claimChore(id) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.post(`/chores/${id}/claim`);
       const chore = unwrapChore(data);
       const index = chores.value.findIndex(item => item.id === id);
-      if (index !== -1) chores.value[index] = chore;
+      if (isCurrentSession(requestSession) && index !== -1) chores.value[index] = chore;
       return chore;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to pick up chore';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to pick up chore';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function offerChore(id) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.post(`/chores/${id}/offer`);
       const chore = unwrapChore(data);
       const index = chores.value.findIndex(item => item.id === id);
-      if (index !== -1) chores.value[index] = chore;
+      if (isCurrentSession(requestSession) && index !== -1) chores.value[index] = chore;
       return chore;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to offer chore';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to offer chore';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function deleteChore(id) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       await api.delete(`/chores/${id}`);
-      chores.value = chores.value.filter(c => c.id !== id);
+      if (isCurrentSession(requestSession)) {
+        chores.value = chores.value.filter(c => c.id !== id);
+      }
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to delete chore';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to delete chore';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function payChore(choreId) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       await api.post('/payments/pay-chore', { chore_id: choreId });
-      await fetchChores();
+      if (isCurrentSession(requestSession)) await fetchChores();
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to pay chore';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to pay chore';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 

@@ -10,8 +10,25 @@ export const useLedgerStore = defineStore('ledger', () => {
   const summary = ref(null);
   const loading = ref(false);
   const error = ref(null);
+  let session = 0;
+
+  function isCurrentSession(requestSession) {
+    return requestSession === session;
+  }
+
+  function reset() {
+    session += 1;
+    transactions.value = [];
+    ious.value = [];
+    members.value = [];
+    venmoUsername.value = '';
+    summary.value = null;
+    loading.value = false;
+    error.value = null;
+  }
 
   async function fetchLedger() {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
@@ -19,62 +36,77 @@ export const useLedgerStore = defineStore('ledger', () => {
         api.get('/ledger'),
         api.get('/ledger/summary')
       ]);
-      transactions.value = ledgerResponse.data.transactions;
-      ious.value = ledgerResponse.data.ious;
-      members.value = ledgerResponse.data.members;
-      venmoUsername.value = ledgerResponse.data.venmo_username || '';
-      summary.value = summaryResponse.data.summary;
+      if (isCurrentSession(requestSession)) {
+        transactions.value = ledgerResponse.data.transactions;
+        ious.value = ledgerResponse.data.ious;
+        members.value = ledgerResponse.data.members;
+        venmoUsername.value = ledgerResponse.data.venmo_username || '';
+        summary.value = summaryResponse.data.summary;
+      }
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to load the ledger';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to load the ledger';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function markPaid(id) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.patch(`/ledger/ious/${id}/paid`);
       const index = ious.value.findIndex(iou => iou.id === id);
-      if (index !== -1) ious.value[index] = data.iou;
+      if (isCurrentSession(requestSession) && index !== -1) ious.value[index] = data.iou;
       return data.iou;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to confirm the IOU as paid';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to confirm the IOU as paid';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function createIOU(iouData) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.post('/ledger/ious', iouData);
-      ious.value.unshift(data.iou);
+      if (isCurrentSession(requestSession)) ious.value.unshift(data.iou);
       return data.iou;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to create IOU';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to create IOU';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function updateVenmoUsername(username) {
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.patch('/ledger/venmo', { venmo_username: username });
-      venmoUsername.value = data.venmo_username || '';
+      if (isCurrentSession(requestSession)) {
+        venmoUsername.value = data.venmo_username || '';
+      }
       return venmoUsername.value;
     } catch (err) {
-      error.value = err.response?.data?.error || 'Failed to update Venmo username';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to update Venmo username';
+      }
       throw err;
     } finally {
-      loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
