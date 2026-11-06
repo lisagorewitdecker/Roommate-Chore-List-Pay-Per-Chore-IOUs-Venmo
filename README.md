@@ -59,9 +59,13 @@ Server runs at `http://localhost:3000`
 
 ```bash
 cd client
+cp .env.example .env
 npm install
 npm run dev
 ```
+
+Replace the placeholder values in `.env` with your local configuration before
+starting the app. `.env` is ignored by Git.
 
 App runs at `http://localhost:5173`
 
