@@ -33,6 +33,7 @@ async function requestEstimate({
   providerError,
   apiKey = 'test-gemini-key',
   model,
+  geminiConsent = true,
   authorization = true
 } = {}) {
   process.env.JWT_SECRET = secret;
@@ -47,6 +48,7 @@ async function requestEstimate({
   let generateContentCalls = 0;
   const requestedModels = [];
   const app = createApp({
+    pool: { query: async () => ({ rows: [{ session_version: 0 }] }) },
     aiClientFactory: () => ({
       models: {
         async generateContent(request) {
@@ -72,7 +74,7 @@ async function requestEstimate({
         'Content-Type': 'application/json',
         ...(authorization ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ ...body, geminiConsent })
     });
     return { response, body: await response.json(), generateContentCalls, requestedModels };
   } finally {
@@ -111,6 +113,14 @@ test('requires a title and validates chore details before calling Gemini', async
     assert.equal(result.response.status, 400);
     assert.equal(result.generateContentCalls, 0);
   }
+});
+
+test('requires explicit consent before sending chore details to Gemini', async () => {
+  const { response, body, generateContentCalls } = await requestEstimate({ geminiConsent: false });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(body, { error: 'Consent to share chore data with Gemini is required' });
+  assert.equal(generateContentCalls, 0);
 });
 
 test('reports missing Gemini configuration without calling the provider', async () => {

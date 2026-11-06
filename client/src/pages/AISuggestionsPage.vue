@@ -8,12 +8,23 @@
         The AI analyzes your existing chores and roommates to recommend fair and practical tasks.
       </p>
       <p class="text-sm text-gray-500 mb-4">
-        Existing chore titles and anonymous chore counts are sent to Gemini; titles may contain personal information.
-        Names, email addresses, and chore descriptions are not sent. Suggested frequency is informational and is not saved as a recurring schedule.
+        Gemini is a third-party service. AI suggestions send existing chore titles and anonymous assignment counts;
+        price estimates send the chore title and description; fairness analysis sends anonymous chore counts and values.
+        Chore titles and descriptions may contain personal information. Nothing is sent until you agree below.
+        Suggested frequency is informational and is not saved as a recurring schedule.
       </p>
+      <label class="flex items-start gap-2 text-sm text-gray-700 mb-4">
+        <input
+          type="checkbox"
+          :checked="geminiConsent"
+          @change="geminiConsent = $event.target.checked"
+          class="mt-1"
+        />
+        <span>I agree to send the described chore data to Gemini for these AI features. Uncheck this any time to opt out.</span>
+      </label>
       <button
         @click="handleSuggest"
-        :disabled="loading || addingSuggestion !== null"
+        :disabled="!geminiConsent || loading || addingSuggestion !== null"
         class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
       >
         {{ loading ? '🤖 Thinking...' : '🤖 Get AI Suggestions' }}
@@ -56,7 +67,7 @@
       </div>
       <button
         @click="onEstimatePrice"
-        :disabled="estimateLoading || !estimateForm.title.trim()"
+        :disabled="!geminiConsent || estimateLoading || !estimateForm.title.trim()"
         class="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition"
       >
         {{ estimateLoading ? '🤖 Estimating...' : '🤖 Estimate Fair Price' }}
@@ -92,7 +103,7 @@
       </p>
       <button
         @click="handleFairSplit"
-        :disabled="fairLoading"
+        :disabled="!geminiConsent || fairLoading"
         class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
       >
         {{ fairLoading ? '🤖 Analyzing...' : '🤖 Analyze Fairness' }}
@@ -186,6 +197,7 @@ import api from '../utils/api';
 import { useChoreStore } from '../stores/chores';
 
 const choreStore = useChoreStore();
+const geminiConsent = ref(false);
 const suggestions = ref([]);
 const loading = ref(false);
 const error = ref(null);
@@ -205,7 +217,7 @@ async function handleSuggest() {
   suggestions.value = [];
   suggestionAddError.value = null;
   try {
-    const { data } = await api.post('/ai/suggest-chores');
+    const { data } = await api.post('/ai/suggest-chores', { geminiConsent: geminiConsent.value });
     if (!Array.isArray(data?.suggestions)) {
       throw new Error('AI returned an invalid suggestion list. Please try again.');
     }
@@ -222,7 +234,7 @@ async function handleFairSplit() {
   fairError.value = null;
   fairnessAnalysis.value = null;
   try {
-    const { data } = await api.post('/ai/fair-split');
+    const { data } = await api.post('/ai/fair-split', { geminiConsent: geminiConsent.value });
     fairnessAnalysis.value = data.analysis;
   } catch (err) {
     fairError.value = err.response?.data?.error || 'Failed to analyze fairness';
@@ -238,7 +250,8 @@ async function handleEstimatePrice() {
   try {
     const { data } = await api.post('/ai/estimate-price', {
       title: estimateForm.value.title.trim(),
-      description: estimateForm.value.description.trim()
+      description: estimateForm.value.description.trim(),
+      geminiConsent: geminiConsent.value
     });
     if (!Number.isSafeInteger(data?.price_cents) || data.price_cents < 1) {
       throw new Error('The estimator returned an invalid price. Please try again.');

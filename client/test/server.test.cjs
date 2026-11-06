@@ -153,6 +153,26 @@ test('malformed JSON receives a client error response', async () => {
   }
 });
 
+test('API routes are rate-limited without affecting health checks', async () => {
+  const server = await listen(createApp({ pool: {} }));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    for (let request = 0; request < 100; request += 1) {
+      const response = await fetch(`${baseUrl}/api/auth/me`);
+      assert.equal(response.status, 401);
+    }
+
+    const limitedResponse = await fetch(`${baseUrl}/api/auth/me`);
+    assert.equal(limitedResponse.status, 429);
+
+    const healthResponse = await fetch(`${baseUrl}/health`);
+    assert.equal(healthResponse.status, 200);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
 test('all mounted protected routes reject missing and invalid tokens before calling dependencies', async () => {
   await withJwtSecret('server-route-test-secret', async () => {
     let poolCalls = 0;
@@ -220,6 +240,9 @@ test('authenticated profile and payment routes use the injected pool', async () 
     const injectedPool = {
       async query(sql, params) {
         calls.push({ kind: 'pool.query', sql, params });
+        if (sql.includes('SELECT session_version')) {
+          return { rows: [{ session_version: 0 }] };
+        }
         assert.match(sql, /FROM users u/);
         return {
           rows: [{
@@ -303,7 +326,8 @@ test('authenticated profile and payment routes use the injected pool', async () 
         transaction: { id: 'transaction-1', amount_cents: 400 }
       });
 
-      assert.equal(calls.filter(call => call.kind === 'pool.query').length, 1);
+      assert.equal(calls.filter(call => call.kind === 'pool.query' && call.sql.includes('FROM users u')).length, 1);
+      assert.equal(calls.filter(call => call.kind === 'pool.query' && call.sql.includes('SELECT session_version')).length, 2);
       assert.equal(calls.filter(call => call.kind === 'pool.connect').length, 1);
       assert.equal(releaseCount, 1);
       assert.ok(calls.some(call => call.kind === 'client.query' && call.sql === 'COMMIT'));
@@ -502,6 +526,9 @@ test('separate app instances retain their own CORS, pool, and AI client dependen
       const createProfilePool = (userId, name, calls) => ({
         async query(sql) {
           calls.push(sql);
+          if (sql.includes('SELECT session_version')) {
+            return { rows: [{ session_version: 0 }] };
+          }
           return {
             rows: [{
               id: userId,
@@ -582,7 +609,11 @@ test('separate app instances retain their own CORS, pool, and AI client dependen
               Origin: instance.origin,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ title: 'Clean kitchen', description: 'Wipe surfaces' })
+            body: JSON.stringify({
+              title: 'Clean kitchen',
+              description: 'Wipe surfaces',
+              geminiConsent: true
+            })
           });
           assert.equal(estimateResponse.status, 200);
           assert.equal(estimateResponse.headers.get('access-control-allow-origin'), instance.origin);
@@ -593,8 +624,8 @@ test('separate app instances retain their own CORS, pool, and AI client dependen
           });
         }
 
-        assert.equal(firstPoolCalls.length, 1);
-        assert.equal(secondPoolCalls.length, 1);
+        assert.equal(firstPoolCalls.length, 3);
+        assert.equal(secondPoolCalls.length, 3);
         assert.deepEqual(firstAiCalls, ['server-instance-test-api-key']);
         assert.deepEqual(secondAiCalls, ['server-instance-test-api-key']);
       } finally {
@@ -649,6 +680,9 @@ test('JSON parser rejects strict primitives and unsupported encodings while non-
     const token = jwt.sign({ id: '88888888-8888-4888-8888-888888888888' }, process.env.JWT_SECRET);
     const server = await listen(createApp({
       pool: {
+        async query() {
+          return { rows: [{ session_version: 0 }] };
+        },
         async connect() {
           dependencyCalls += 1;
           throw new Error('Payment dependency should not run');

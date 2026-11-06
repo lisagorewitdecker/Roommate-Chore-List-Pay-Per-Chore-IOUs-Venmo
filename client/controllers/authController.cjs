@@ -1,16 +1,23 @@
 const bcrypt = require('bcrypt');
 const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
+const {
+  isPasswordResetEmailConfigured,
+  sendPasswordResetEmail: deliverPasswordResetEmail
+} = require('../services/passwordResetMailer.cjs');
 
 const BCRYPT_SALT_ROUNDS = 12;
 const JWT_EXPIRES_IN = '7d';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_RESET_MESSAGE = 'If an account exists for that email, a password reset link has been sent.';
+const INVALID_PASSWORD_RESET_MESSAGE = 'Invalid or expired password reset link';
 
 function generateToken(user) {
   return jwt.sign({
     id: user.id,
     email: user.email,
-    household_id: user.household_id
+    household_id: user.household_id,
+    session_version: user.session_version ?? 0
   }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
@@ -28,7 +35,10 @@ function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function createAuthController(pool) {
+function createAuthController(pool, {
+  sendPasswordResetEmail = deliverPasswordResetEmail,
+  passwordResetEmailConfigured = isPasswordResetEmailConfigured
+} = {}) {
   async function register(req, res) {
     const body = req.body;
     if (!isObject(body) || typeof body.name !== 'string' || typeof body.email !== 'string' || typeof body.password !== 'string') {
@@ -109,7 +119,7 @@ function createAuthController(pool) {
       const userResult = await client.query(
         `INSERT INTO users (name, email, password_hash, household_id, balance_cents)
          VALUES ($1, $2, $3, $4, 0)
-         RETURNING id, name, email, household_id, balance_cents, created_at`,
+         RETURNING id, name, email, household_id, balance_cents, session_version, created_at`,
         [name, email, passwordHash, assignedHouseholdId]
       );
 
@@ -159,7 +169,7 @@ function createAuthController(pool) {
 
     try {
       const result = await pool.query(
-        `SELECT id, name, email, password_hash, household_id, balance_cents
+        `SELECT id, name, email, password_hash, household_id, balance_cents, session_version
          FROM users
          WHERE LOWER(email) = LOWER($1)`,
         [email]
@@ -178,6 +188,97 @@ function createAuthController(pool) {
     } catch (error) {
       console.error('Login error:', error);
       return res.status(500).json({ error: 'Internal server error during authentication' });
+    }
+  }
+
+  async function requestPasswordReset(req, res) {
+    const body = req.body;
+    if (!isObject(body) || typeof body.email !== 'string' || !body.email.trim()) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const email = body.email.trim().toLowerCase();
+    if (!EMAIL_PATTERN.test(email) || email.length > 255) {
+      return res.status(400).json({ error: 'Please provide a valid email address' });
+    }
+    if (!passwordResetEmailConfigured()) {
+      return res.status(503).json({
+        error: 'Password reset email is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM.'
+      });
+    }
+
+    try {
+      const result = await pool.query(
+        'SELECT id, email FROM users WHERE LOWER(email) = LOWER($1)',
+        [email]
+      );
+      const user = result.rows[0];
+      if (user) {
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        await pool.query(
+          `UPDATE users
+           SET password_reset_token_hash = $1,
+               password_reset_token_expires_at = NOW() + INTERVAL '1 hour'
+           WHERE id = $2`,
+          [tokenHash, user.id]
+        );
+
+        const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+        const resetUrl = new URL('/reset-password', `${clientOrigin.replace(/\/$/, '')}/`);
+        resetUrl.searchParams.set('token', token);
+        try {
+          void Promise.resolve(sendPasswordResetEmail({ to: user.email, resetUrl: resetUrl.toString() }))
+            .catch(error => console.error('Password reset email delivery failed:', error));
+        } catch (error) {
+          console.error('Password reset email delivery failed:', error);
+        }
+      }
+
+      return res.status(200).json({ message: PASSWORD_RESET_MESSAGE });
+    } catch (error) {
+      console.error('Password reset request failed:', error);
+      return res.status(500).json({ error: 'Unable to send password reset email. Please try again later.' });
+    }
+  }
+
+  async function completePasswordReset(req, res) {
+    const body = req.body;
+    if (!isObject(body) || typeof body.token !== 'string' || typeof body.password !== 'string') {
+      return res.status(400).json({ error: 'A reset token and new password are required' });
+    }
+    if (body.password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+    if (Buffer.byteLength(body.password, 'utf8') > 72) {
+      return res.status(400).json({ error: 'Password must not exceed 72 bytes' });
+    }
+    if (!/^[a-f0-9]{64}$/.test(body.token)) {
+      return res.status(400).json({ error: INVALID_PASSWORD_RESET_MESSAGE });
+    }
+
+    try {
+      const tokenHash = crypto.createHash('sha256').update(body.token).digest('hex');
+      const passwordHash = await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS);
+      const result = await pool.query(
+        `UPDATE users
+         SET password_hash = $1,
+             password_reset_token_hash = NULL,
+             password_reset_token_expires_at = NULL,
+             session_version = session_version + 1
+         WHERE password_reset_token_hash = $2
+           AND password_reset_token_expires_at > NOW()
+         RETURNING id`,
+        [passwordHash, tokenHash]
+      );
+      if (result.rows.length === 0) {
+        return res.status(400).json({ error: INVALID_PASSWORD_RESET_MESSAGE });
+      }
+
+      return res.status(200).json({ message: 'Password has been reset. You can now sign in.' });
+    } catch (error) {
+      console.error('Password reset completion failed:', error);
+      return res.status(500).json({ error: 'Password reset failed due to an internal server error' });
     }
   }
 
@@ -226,7 +327,7 @@ function createAuthController(pool) {
     }
   }
 
-  return { register, login, getProfile };
+  return { register, login, requestPasswordReset, completePasswordReset, getProfile };
 }
 
 module.exports = { createAuthController };

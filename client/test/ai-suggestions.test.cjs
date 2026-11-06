@@ -29,6 +29,7 @@ async function requestSuggestions({
   providerError,
   fetchImpl,
   apiKey = 'test-gemini-key',
+  geminiConsent = true,
   authorization = true,
   databaseError
 } = {}) {
@@ -41,7 +42,8 @@ async function requestSuggestions({
   const pool = {
     async query(sql, values) {
       queries.push({ sql, values });
-      if (databaseError) throw databaseError;
+      if (databaseError && !sql.includes('SELECT session_version')) throw databaseError;
+      if (sql.includes('SELECT session_version')) return { rows: [{ session_version: 0 }] };
       if (sql.includes('SELECT household_id FROM users')) {
         return { rows: [{ household_id: householdId }] };
       }
@@ -74,7 +76,9 @@ async function requestSuggestions({
     const token = jwt.sign({ id: 'test-user', household_id: 'stale-household' }, secret);
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/ai/suggest-chores`, {
       method: 'POST',
+      body: JSON.stringify({ geminiConsent }),
       headers: {
+        'Content-Type': 'application/json',
         ...(authorization ? { Authorization: `Bearer ${token}` } : {})
       }
     });
@@ -97,10 +101,10 @@ test('suggests chores from current household titles and anonymized workloads', a
       reason: 'Keeps shared surfaces hygienic.'
     }]
   });
-  assert.equal(queries.length, 3);
-  assert.deepEqual(queries[0].values, ['test-user']);
-  assert.deepEqual(queries[1].values, ['household-a', 20]);
-  assert.deepEqual(queries[2].values, ['household-a']);
+  assert.equal(queries.length, 4);
+  assert.deepEqual(queries[1].values, ['test-user']);
+  assert.deepEqual(queries[2].values, ['household-a', 20]);
+  assert.deepEqual(queries[3].values, ['household-a']);
   const prompt = modelRequests[0].contents[0].parts[0].text;
   assert.match(prompt, /Wash shared dishes/);
   assert.match(prompt, /Take out household recycling/);
@@ -160,12 +164,22 @@ test('requires authentication before reading household data', async () => {
   assert.equal(modelRequests.length, 0);
 });
 
+test('requires explicit consent before reading household data or calling Gemini', async () => {
+  const { response, body, queries, modelRequests } = await requestSuggestions({ geminiConsent: false });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(body, { error: 'Consent to share chore data with Gemini is required' });
+  assert.equal(queries.length, 1);
+  assert.match(queries[0].sql, /SELECT session_version/);
+  assert.equal(modelRequests.length, 0);
+});
+
 test('uses current database membership and rejects accounts without a household', async () => {
   const { response, body, queries, modelRequests } = await requestSuggestions({ householdId: null });
 
   assert.equal(response.status, 403);
   assert.deepEqual(body, { error: 'Your account is not part of a household' });
-  assert.equal(queries.length, 1);
+  assert.equal(queries.length, 2);
   assert.equal(modelRequests.length, 0);
 });
 

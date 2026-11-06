@@ -35,6 +35,10 @@ function parseSuggestions(value) {
 
 function createAiSuggestionsController(pool, aiClientFactory = createGeminiClient) {
   return async (req, res) => {
+    if (req.body?.geminiConsent !== true) {
+      return res.status(400).json({ error: 'Consent to share chore data with Gemini is required' });
+    }
+
     try {
       const membership = await pool.query(
         'SELECT household_id FROM users WHERE id = $1',
