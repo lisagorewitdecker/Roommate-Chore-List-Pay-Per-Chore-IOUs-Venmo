@@ -248,6 +248,7 @@ test('registration validates input before acquiring a database client', async ()
   const cases = [
     { body: {}, error: 'Name, email, and password are required' },
     { body: { name: 'Name', email: 'invalid-email', password: 'password123' }, error: 'Please provide a valid email address' },
+    { body: { name: 'Name', email: `${'a'.repeat(10000)}@example.com`, password: 'password123' }, error: 'Please provide a valid email address' },
     { body: { name: 'Name', email: 'name@example.com', password: 'short' }, error: 'Password must be at least 8 characters long' },
     { body: { name: 'Name', email: 'name@example.com', password: 'é'.repeat(37) }, error: 'Password must not exceed 72 bytes' },
     { body: { name: 'x'.repeat(101), email: 'name@example.com', password: 'password123' }, error: 'Name must be between 1 and 100 characters' },
@@ -381,6 +382,12 @@ test('login validates required credentials and email format before querying the 
     });
     assert.equal(invalidEmail.response.status, 400);
     assert.deepEqual(invalidEmail.body, { error: 'Please provide a valid email address' });
+
+    const overlongEmail = await post(baseUrl, '/api/auth/login', {
+      email: `${'a'.repeat(10000)}@example.com`, password: 'password123'
+    });
+    assert.equal(overlongEmail.response.status, 400);
+    assert.deepEqual(overlongEmail.body, { error: 'Please provide a valid email address' });
   });
 
   assert.equal(pool.queryLog.length, 0);
@@ -537,4 +544,21 @@ test('health endpoint responds and exposes the configured client origin through 
     if (previousOrigin === undefined) delete process.env.CLIENT_ORIGIN;
     else process.env.CLIENT_ORIGIN = previousOrigin;
   }
+});
+
+test('API requests are rate limited while health checks remain available', async () => {
+  const pool = new MemoryPool();
+
+  await withApi(pool, async baseUrl => {
+    for (let request = 0; request < 100; request += 1) {
+      const response = await fetch(`${baseUrl}/api/rate-limit-check`);
+      assert.equal(response.status, 404);
+    }
+
+    const limitedResponse = await fetch(`${baseUrl}/api/rate-limit-check`);
+    assert.equal(limitedResponse.status, 429);
+
+    const healthResponse = await fetch(`${baseUrl}/health`);
+    assert.equal(healthResponse.status, 200);
+  });
 });

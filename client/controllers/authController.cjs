@@ -54,7 +54,7 @@ function createAuthController(pool, {
     if (!name || name.length > 100) {
       return res.status(400).json({ error: 'Name must be between 1 and 100 characters' });
     }
-    if (!EMAIL_PATTERN.test(email) || email.length > 255) {
+    if (email.length > 255 || !EMAIL_PATTERN.test(email)) {
       return res.status(400).json({ error: 'Please provide a valid email address' });
     }
     if (password.length < 8) {
@@ -160,7 +160,7 @@ function createAuthController(pool, {
     }
 
     const email = body.email.trim().toLowerCase();
-    if (!EMAIL_PATTERN.test(email) || email.length > 255) {
+    if (email.length > 255 || !EMAIL_PATTERN.test(email)) {
       return res.status(400).json({ error: 'Please provide a valid email address' });
     }
     if (Buffer.byteLength(body.password, 'utf8') > 72) {

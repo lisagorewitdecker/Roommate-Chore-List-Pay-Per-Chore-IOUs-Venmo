@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const { rateLimit } = require('express-rate-limit');
 const rateLimit = require('express-rate-limit');
 const pool = require('./db.cjs');
 const createAuthMiddleware = require('./middleware/auth.js');
@@ -28,6 +29,9 @@ function createApp({
   }));
   app.use('/api', rateLimit({
     windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: true,
+    legacyHeaders: false
     max: 100
   }));
   app.use(express.json({ limit: '16kb' }));
