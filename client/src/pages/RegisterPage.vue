@@ -6,8 +6,9 @@
 
       <form @submit.prevent="handleRegister" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+          <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
           <input
+            id="name"
             v-model="name"
             type="text"
             required
@@ -16,8 +17,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
+            id="email"
             v-model="email"
             type="email"
             required
@@ -26,8 +28,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
           <input
+            id="password"
             v-model="password"
             type="password"
             required
@@ -38,8 +41,9 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Household name (optional)</label>
+          <label for="household-name" class="block text-sm font-medium text-gray-700 mb-1">Household name (optional)</label>
           <input
+            id="household-name"
             v-model="householdName"
             type="text"
             maxlength="100"
@@ -48,8 +52,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Invite code (to join an existing household)</label>
+          <label for="invite-code" class="block text-sm font-medium text-gray-700 mb-1">Invite code (to join an existing household)</label>
           <input
+            id="invite-code"
             v-model="inviteCode"
             type="text"
             maxlength="12"
