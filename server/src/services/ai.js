@@ -65,12 +65,9 @@ Focus on practical, fair chores that promote a clean and harmonious living envir
       }
 
       const userId = req.user.id;
-      const users = await db('users').select('id', 'name');
       const chores = await db('chores')
         .select('title', 'cost_cents', 'assigned_to', 'is_completed', 'frequency')
-        .leftJoin('users as assignee', 'chores.assigned_to', 'assignee.id')
-        .pluck('chores')
-        .map(row => row);
+        .where('assigned_to', userId);
 
       const ledger = await db('ledger_transactions')
         .select(
@@ -83,7 +80,21 @@ Focus on practical, fair chores that promote a clean and harmonious living envir
         )
         .join('users as from_u', 'ledger_transactions.from_user', 'from_u.id')
         .join('users as to_u', 'ledger_transactions.to_user', 'to_u.id')
-        .where('ledger_transactions.status', 'pending');
+        .where('ledger_transactions.status', 'pending')
+        .andWhere(function () {
+          this.where('ledger_transactions.from_user', userId).orWhere('ledger_transactions.to_user', userId);
+        });
+
+      const relatedUserIds = new Set([userId]);
+      chores.forEach((c) => {
+        if (c.assigned_to) relatedUserIds.add(c.assigned_to);
+      });
+      ledger.forEach((t) => {
+        if (t.from_user) relatedUserIds.add(t.from_user);
+        if (t.to_user) relatedUserIds.add(t.to_user);
+      });
+
+      const users = await db('users').select('id', 'name').whereIn('id', Array.from(relatedUserIds));
 
       const prompt = `
 You are a fair chore and payment analysis assistant for roommates.
