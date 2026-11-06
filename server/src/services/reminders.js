@@ -39,6 +39,9 @@ const ReminderController = {
 
       const transaction = await db('ledger_transactions')
         .where({ id: transaction_id, status: 'pending' })
+        .where(function () {
+          this.where('from_user', req.user.id).orWhere('to_user', req.user.id);
+        })
         .first();
 
       if (!transaction) {
