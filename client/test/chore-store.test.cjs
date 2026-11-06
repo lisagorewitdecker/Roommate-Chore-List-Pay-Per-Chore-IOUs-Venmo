@@ -327,3 +327,34 @@ test('payChore reports refresh failures and preserves the current chore list', a
     restore();
   }
 });
+
+test('reset ignores chore requests started before the reset', async () => {
+  const pendingRequests = [];
+  const { store, restore } = await setup(config => new Promise((resolve, reject) => {
+    pendingRequests.push({ config, resolve, reject });
+  }));
+
+  try {
+    const request = store.fetchChores();
+    await new Promise(resolve => setImmediate(resolve));
+    store.reset();
+    pendingRequests[0].resolve(makeResponse(pendingRequests[0].config, [{ id: 'stale' }]));
+    await request;
+    assert.deepEqual(store.chores, []);
+    assert.equal(store.loading, false);
+    assert.equal(store.error, null);
+
+    const failedRequest = store.fetchChores();
+    await new Promise(resolve => setImmediate(resolve));
+    store.reset();
+    pendingRequests[1].reject(Object.assign(new Error('stale request failed'), {
+      response: { data: { error: 'Stale chore error' }, status: 500 }
+    }));
+    await assert.rejects(failedRequest, /stale request failed/);
+    assert.deepEqual(store.chores, []);
+    assert.equal(store.loading, false);
+    assert.equal(store.error, null);
+  } finally {
+    restore();
+  }
+});

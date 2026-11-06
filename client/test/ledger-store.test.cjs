@@ -110,3 +110,50 @@ test('ledger failures remain visible and reset the loading state', async () => {
     restore();
   }
 });
+
+test('reset ignores ledger requests started before the reset', async () => {
+  const pendingRequests = [];
+  const { store, restore } = await setup(config => new Promise((resolve, reject) => {
+    pendingRequests.push({ config, resolve, reject });
+  }));
+
+  try {
+    const request = store.fetchLedger();
+    await new Promise(resolve => setImmediate(resolve));
+    store.reset();
+    pendingRequests.forEach(({ config, resolve }) => resolve(makeResponse(config, config.url === '/ledger'
+      ? {
+          transactions: [{ id: 'stale-transaction' }],
+          ious: [{ id: 'stale-iou' }],
+          members: [{ id: 'stale-member' }],
+          venmo_username: 'stale-user'
+        }
+      : { summary: { netBalance: 1 } })));
+    await request;
+    assert.deepEqual(store.transactions, []);
+    assert.deepEqual(store.ious, []);
+    assert.deepEqual(store.members, []);
+    assert.equal(store.venmoUsername, '');
+    assert.equal(store.summary, null);
+    assert.equal(store.loading, false);
+    assert.equal(store.error, null);
+
+    const failedRequest = store.fetchLedger();
+    await new Promise(resolve => setImmediate(resolve));
+    store.reset();
+    pendingRequests[2].reject(Object.assign(new Error('stale request failed'), {
+      response: { data: { error: 'Stale ledger error' }, status: 500 }
+    }));
+    pendingRequests[3].resolve(makeResponse(pendingRequests[3].config, { summary: { netBalance: 2 } }));
+    await assert.rejects(failedRequest, /stale request failed/);
+    assert.deepEqual(store.transactions, []);
+    assert.deepEqual(store.ious, []);
+    assert.deepEqual(store.members, []);
+    assert.equal(store.venmoUsername, '');
+    assert.equal(store.summary, null);
+    assert.equal(store.loading, false);
+    assert.equal(store.error, null);
+  } finally {
+    restore();
+  }
+});

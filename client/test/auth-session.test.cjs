@@ -84,3 +84,53 @@ test('logout clears household stores and ignores responses from the previous ses
     else Object.defineProperty(global, 'localStorage', previousLocalStorage);
   }
 });
+
+test('registration succeeds and keeps its session when profile enrichment fails', async () => {
+  const [{ createPinia, setActivePinia }, { default: api }, { useAuthStore }] = await Promise.all([
+    import('pinia'),
+    import('../src/utils/api.js'),
+    import('../src/stores/auth.js')
+  ]);
+  const previousAdapter = api.defaults.adapter;
+  const previousLocalStorage = Object.getOwnPropertyDescriptor(global, 'localStorage');
+  const stored = new Map();
+  Object.defineProperty(global, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: key => stored.get(key) || null,
+      setItem: (key, value) => stored.set(key, value),
+      removeItem: key => stored.delete(key)
+    }
+  });
+  api.defaults.adapter = async config => {
+    if (config.url === '/auth/register') {
+      return {
+        config,
+        data: { token: 'new-token', user: { id: 1, email: 'new@example.com' } },
+        status: 201,
+        statusText: 'Created',
+        headers: {}
+      };
+    }
+    return Promise.reject({
+      config,
+      response: { status: 500, data: { error: 'Internal Server Error' } }
+    });
+  };
+  setActivePinia(createPinia());
+
+  try {
+    const auth = useAuthStore();
+    const result = await auth.register('New User', 'new@example.com', 'password');
+
+    assert.equal(result.token, 'new-token');
+    assert.equal(auth.token, 'new-token');
+    assert.deepEqual(auth.user, { id: 1, email: 'new@example.com' });
+    assert.equal(stored.get('token'), 'new-token');
+    assert.deepEqual(JSON.parse(stored.get('user')), { id: 1, email: 'new@example.com' });
+  } finally {
+    api.defaults.adapter = previousAdapter;
+    if (previousLocalStorage === undefined) delete global.localStorage;
+    else Object.defineProperty(global, 'localStorage', previousLocalStorage);
+  }
+});

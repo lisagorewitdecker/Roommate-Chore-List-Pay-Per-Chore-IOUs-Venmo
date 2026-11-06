@@ -7,9 +7,9 @@
 
       <form @submit.prevent="handleLogin" class="space-y-4">
         <div>
-          <label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
-            id="login-email"
+            id="email"
             v-model="email"
             type="email"
             required
@@ -18,9 +18,9 @@
           />
         </div>
         <div>
-          <label for="login-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
           <input
-            id="login-password"
+            id="password"
             v-model="password"
             type="password"
             required
@@ -30,6 +30,9 @@
         </div>
 
         <p v-if="authStore.error" class="text-sm text-red-600">{{ authStore.error }}</p>
+        <p v-if="passwordResetSuccess" class="text-sm text-green-700" role="status">
+          Your password has been reset. Please sign in.
+        </p>
 
         <button
           type="submit"
@@ -39,6 +42,10 @@
           {{ authStore.loading ? 'Signing in...' : 'Sign In' }}
         </button>
       </form>
+
+      <p class="mt-4 text-center text-sm">
+        <router-link to="/reset-password" class="text-indigo-600 hover:underline">Forgot your password?</router-link>
+      </p>
 
       <p class="mt-4 text-center text-sm text-gray-600">
         Don't have an account?
@@ -55,12 +62,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+const passwordResetSuccess = computed(() => route.query.reset === 'success');
 const email = ref('');
 const password = ref('');
 

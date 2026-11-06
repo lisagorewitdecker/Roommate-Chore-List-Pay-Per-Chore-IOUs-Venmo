@@ -20,9 +20,9 @@
       <form @submit.prevent="handleCreate" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label for="chore-title" class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label for="title" class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
             <input
-              id="chore-title"
+              id="title"
               :value="form.title"
               @input="form.title = $event.target.value"
               type="text"
@@ -32,9 +32,9 @@
             />
           </div>
           <div>
-            <label for="chore-cost" class="block text-sm font-medium text-gray-700 mb-1">Cost ($)</label>
+            <label for="cost" class="block text-sm font-medium text-gray-700 mb-1">Cost ($)</label>
             <input
-              id="chore-cost"
+              id="cost"
               :value="form.costDollars"
               @input="form.costDollars = $event.target.value"
               type="number"
@@ -46,9 +46,9 @@
             />
           </div>
           <div>
-            <label for="chore-due-date" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+            <label for="due-date" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
             <input
-              id="chore-due-date"
+              id="due-date"
               :value="form.due_date"
               @input="form.due_date = $event.target.value"
               type="date"
@@ -57,9 +57,9 @@
           </div>
         </div>
         <div>
-          <label for="chore-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea
-            id="chore-description"
+            id="description"
             :value="form.description"
             @input="form.description = $event.target.value"
             rows="2"
@@ -68,9 +68,9 @@
           ></textarea>
         </div>
         <div>
-          <label for="chore-assignment" class="block text-sm font-medium text-gray-700 mb-1">Assignment</label>
+          <label for="assignment" class="block text-sm font-medium text-gray-700 mb-1">Assignment</label>
           <select
-            id="chore-assignment"
+            id="assignment"
             :value="form.assigned_to"
             @change="form.assigned_to = $event.target.value"
             class="w-full md:w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"

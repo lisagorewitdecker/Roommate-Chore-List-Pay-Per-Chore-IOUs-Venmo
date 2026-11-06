@@ -41,6 +41,10 @@ function createAiPricingController(aiClientFactory = createGeminiClient) {
       return res.status(400).json({ error: 'A valid chore title and description are required' });
     }
 
+    if (req.body?.geminiConsent !== true) {
+      return res.status(400).json({ error: 'Consent to share chore data with Gemini is required' });
+    }
+
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       return res.status(503).json({

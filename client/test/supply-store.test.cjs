@@ -67,3 +67,39 @@ test('purchase API failures remain visible and keep the supply on the active lis
     restore();
   }
 });
+
+test('reset ignores supply requests started before the reset', async () => {
+  const pendingRequests = [];
+  const { store, restore } = await setup(config => new Promise((resolve, reject) => {
+    pendingRequests.push({ config, resolve, reject });
+  }));
+
+  try {
+    const request = store.fetchSupplies();
+    await new Promise(resolve => setImmediate(resolve));
+    store.reset();
+    pendingRequests[0].resolve(makeResponse(pendingRequests[0].config, {
+      supplies: [{ id: 'stale' }],
+      members: [{ id: 'stale-member' }]
+    }));
+    await request;
+    assert.deepEqual(store.supplies, []);
+    assert.deepEqual(store.members, []);
+    assert.equal(store.loading, false);
+    assert.equal(store.error, null);
+
+    const failedRequest = store.fetchSupplies();
+    await new Promise(resolve => setImmediate(resolve));
+    store.reset();
+    pendingRequests[1].reject(Object.assign(new Error('stale request failed'), {
+      response: { data: { error: 'Stale supply error' }, status: 500 }
+    }));
+    await assert.rejects(failedRequest, /stale request failed/);
+    assert.deepEqual(store.supplies, []);
+    assert.deepEqual(store.members, []);
+    assert.equal(store.loading, false);
+    assert.equal(store.error, null);
+  } finally {
+    restore();
+  }
+});

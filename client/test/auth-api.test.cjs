@@ -84,6 +84,7 @@ class MemoryPool {
             password_hash,
             household_id,
             balance_cents: 0,
+            session_version: 0,
             created_at: new Date().toISOString()
           };
           transaction.users.push(user);
@@ -106,6 +107,10 @@ class MemoryPool {
       const email = values[0].toLowerCase();
       const user = this.users.find(row => row.email.toLowerCase() === email);
       return { rows: user ? [{ ...user }] : [] };
+    }
+    if (query.startsWith('select session_version from users')) {
+      const user = this.users.find(row => row.id === values[0]);
+      return { rows: user ? [{ session_version: user.session_version ?? 0 }] : [] };
     }
     if (query.startsWith('select u.id')) {
       if (this.failOnProfileQuery) throw new Error('injected profile query failure');
@@ -192,6 +197,7 @@ test('registers a user and creates a household in one transaction without exposi
       id: pool.users[0].id,
       email: 'alex@example.com',
       household_id: pool.households[0].id,
+      session_version: 0,
       iat: jwt.decode(body.token).iat,
       exp: jwt.decode(body.token).exp
     });
@@ -251,13 +257,13 @@ test('registration validates input before acquiring a database client', async ()
     { body: { name: 'Name', email: 'name@example.com', password: 'password123', invite_code: 'X'.repeat(13) }, error: 'Invite code is invalid' }
   ];
 
-  await withApi(pool, async baseUrl => {
-    for (const item of cases) {
+  for (const item of cases) {
+    await withApi(pool, async baseUrl => {
       const { response, body } = await post(baseUrl, '/api/auth/register', item.body);
       assert.equal(response.status, 400);
       assert.deepEqual(body, { error: item.error });
-    }
-  });
+    });
+  }
 
   assert.equal(pool.connectCount, 0);
 });
@@ -324,7 +330,8 @@ test('login uses a generic credential error and profile returns only safe user f
     email: 'alex@example.com',
     password_hash: await bcrypt.hash('correct-password', 4),
     household_id: household.id,
-    balance_cents: 1234
+    balance_cents: 1234,
+    session_version: 0
   };
   const pool = new MemoryPool({ users: [user], households: [household] });
 
@@ -407,14 +414,15 @@ test('profile rejects an invalid authenticated user and reports a missing profil
     const missingProfileResponse = await fetch(`${baseUrl}/api/auth/me`, {
       headers: { Authorization: `Bearer ${missingProfileToken}` }
     });
-    assert.equal(missingProfileResponse.status, 404);
-    assert.deepEqual(await missingProfileResponse.json(), { error: 'User profile not found' });
+    assert.equal(missingProfileResponse.status, 403);
+    assert.deepEqual(await missingProfileResponse.json(), { error: 'Invalid or expired token' });
   });
 });
 
 test('profile returns a safe server error when the user query fails', async () => {
-  const pool = new MemoryPool({ failOnProfileQuery: true });
-  const token = jwt.sign({ id: randomUUID() }, secret);
+  const user = { id: randomUUID(), session_version: 0 };
+  const pool = new MemoryPool({ users: [user], failOnProfileQuery: true });
+  const token = jwt.sign({ id: user.id }, secret);
 
   await withApi(pool, async baseUrl => {
     const response = await fetch(`${baseUrl}/api/auth/me`, {
@@ -471,6 +479,46 @@ test('registration rolls back on database and token-signing failures', async () 
   assert.equal(signingFailurePool.releaseCount, 1);
   assert.equal(signingFailurePool.users.length, 0);
   assert.equal(signingFailurePool.households.length, 0);
+});
+
+test('registration and login have independent rate limits and do not reach the database after blocking', async () => {
+  const pool = new MemoryPool();
+
+  await withApi(pool, async baseUrl => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const result = await post(baseUrl, '/api/auth/register', {
+        name: 'Roommate', email: `roommate-${attempt}@example.com`, password: 'password123'
+      });
+      assert.equal(result.response.status, 201);
+    }
+
+    const connectCountAfterRegistrations = pool.connectCount;
+    const registrationLimit = await post(baseUrl, '/api/auth/register', {
+      name: 'Roommate', email: 'blocked@example.com', password: 'password123'
+    });
+    assert.equal(registrationLimit.response.status, 429);
+    assert.deepEqual(registrationLimit.body, { error: 'Too many registration attempts. Please try again later.' });
+    assert.equal(registrationLimit.response.headers.get('ratelimit-limit'), '5');
+    assert.match(registrationLimit.response.headers.get('retry-after'), /^\d+$/);
+    assert.equal(pool.connectCount, connectCountAfterRegistrations);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const result = await post(baseUrl, '/api/auth/login', {
+        email: 'missing@example.com', password: 'password123'
+      });
+      assert.equal(result.response.status, 401);
+    }
+
+    const queryCountAfterLogins = pool.queryLog.length;
+    const loginLimit = await post(baseUrl, '/api/auth/login', {
+      email: 'missing@example.com', password: 'password123'
+    });
+    assert.equal(loginLimit.response.status, 429);
+    assert.deepEqual(loginLimit.body, { error: 'Too many login attempts. Please try again later.' });
+    assert.equal(loginLimit.response.headers.get('ratelimit-limit'), '5');
+    assert.match(loginLimit.response.headers.get('retry-after'), /^\d+$/);
+    assert.equal(pool.queryLog.length, queryCountAfterLogins);
+  });
 });
 
 test('health endpoint responds and exposes the configured client origin through CORS', async () => {
