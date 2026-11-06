@@ -108,15 +108,15 @@ const ChoreController = {
 
       await db.transaction(async (trx) => {
         // Mark chore as completed
-        await trx('chores')
-          .where({ id: req.params.id })
+        const completionUpdated = await trx('chores')
+          .where({ id: req.params.id, is_completed: false })
           .update({
             is_completed: true,
             completed_at: new Date()
           });
 
         // Create ledger transaction if chore has a cost and is assigned
-        if (chore.cost_cents > 0 && chore.assigned_to && chore.created_by && chore.assigned_to !== chore.created_by) {
+        if (completionUpdated && chore.cost_cents > 0 && chore.assigned_to && chore.created_by && chore.assigned_to !== chore.created_by) {
           await trx('ledger_transactions').insert({
             from_user: chore.assigned_to,
             to_user: chore.created_by,
