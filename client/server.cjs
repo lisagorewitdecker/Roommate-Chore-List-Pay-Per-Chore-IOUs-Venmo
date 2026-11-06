@@ -32,6 +32,10 @@ function createApp({
     windowMs: 15 * 60 * 1000,
     max: 100
   }));
+  const pageLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200
+  });
   app.use(express.json({ limit: '16kb' }));
   app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool, {
     sendPasswordResetEmail,
@@ -63,7 +67,7 @@ function createApp({
   app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
   app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found' }));
   app.use(express.static(distPath));
-  app.get('*', (req, res, next) => {
+  app.get('*', pageLimiter, (req, res, next) => {
     if (path.extname(req.path) || !req.accepts('html')) return next();
     return res.sendFile(path.join(distPath, 'index.html'));
   });
