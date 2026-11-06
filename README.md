@@ -1,128 +1,111 @@
-# Roommate Chore List — Pay Per Chore, IOUs & Venmo
+# Roommate Chore List - Pay Per Chore, IOUs & Venmo
 
-A full-stack application for roommates to manage household chores, track pay-per-chore payments, and settle IOUs — powered by AI suggestions.
+A Vue 3 frontend, Express API, and PostgreSQL database for household chores,
+cleaning supplies, shared expenses, and IOUs, with optional Gemini suggestions.
 
-## Architecture
+## Runtime and setup
 
-```
-Vue 3 Client (Vite, Pinia, Tailwind)
-   |  (JWT Bearer Token / JSON REST)
-[ Express API Server (Node.js) ]
-   |           |           |
-[ Auth ]   [ AI ]   [ PostgreSQL ]
-(bcrypt)  (Gemini)  - Atomic Ledger Transactions
-                  - Chore CRUD & Relational Schemas
-```
+The current frontend and matching API both live in `client/`. Root npm scripts
+delegate there. The older `server/src` implementation and Knex schema are not
+compatible with the current frontend; do not use them to run this application.
 
-## Features
-
-- **User Authentication** — Register, login, JWT-based sessions with bcrypt password hashing
-- **Chore CRUD** — Create, read, update, complete, and delete chores
-- **Pay-Per-Chore Ledger** — Atomic transactions track who owes whom; all monetary values stored as integer cents
-- **IOU Tracking** — Real-time summary of who owes whom, mark payments as settled
-- **AI-Powered Suggestions** — Gemini AI suggests new chores and analyzes fairness of chore distribution
-- **Payment Reminders** — Schedule and track payment reminders
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js matching `^22.22.2 || ^24.15.0 || >=26.0.0` for the full app
-- Docker & Docker Compose
-- (Optional) Google Gemini API key for AI features
-
-### 1. Start PostgreSQL
+Use Node.js matching `^22.22.2 || ^24.15.0 || >=26.0.0` and Docker Compose.
+From the repository root:
 
 ```bash
-docker compose up -d
+npm ci --prefix client
+cp client/.env.example client/.env
+docker compose up -d postgres
 ```
 
-### 2. Backend Setup
+Set a unique, random `JWT_SECRET` in `client/.env`. The example database URL
+matches the local-only PostgreSQL credentials in `docker-compose.yml`; use
+separate credentials in production. Wait until PostgreSQL is healthy:
 
 ```bash
-cd server
-npm install
-npx knex migrate:latest
-npx knex seed:run
+docker compose ps
+```
+
+Initialize a **new, empty** development database:
+
+```bash
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 \
+  -U roommate_user -d roommate_chore_db < client/database/schema.sql
+```
+
+For an existing current-application database, apply every SQL file in
+`client/database/migrations/` in filename order instead. Do not initialize the
+current application with the legacy Knex migrations.
+
+Start the API and frontend in separate terminals:
+
+```bash
+npm run dev:api
 npm run dev
 ```
 
-Server runs at `http://localhost:3000`
+Open `http://localhost:5173`. Vite proxies `/api` to port 3000. Register a new
+account to create a household, then share the home page's invite code so other
+roommates can join. No demo accounts are created by the current schema.
 
-### 3. Frontend Setup
+For a single-origin deployment:
 
 ```bash
-cd client
-cp .env.example .env
-npm install
-npm run dev
+npm run build
+npm start
 ```
 
-Replace the placeholder values in `.env` with your local configuration before
-starting the app. `.env` is ignored by Git.
+The Express server serves the frontend and API on port 3000 (or `PORT`), including
+direct navigation to frontend routes. Configure `CLIENT_ORIGIN` as the public
+application URL. Production PostgreSQL connections verify TLS certificates;
+`DATABASE_CA_CERT` can supply a provider-specific CA.
 
-App runs at `http://localhost:5173`
+## Chores, supplies, and payment flow
 
-### 4. Configure AI (Optional)
+Post a chore for another roommate to pick up, or assign it to yourself. Only its
+assignee can complete it. Completion atomically records each other household
+member's share as a pending IOU, excluding the worker's own share. Supply purchases
+similarly create shared or beneficiary-specific IOUs using the actual paid cost.
+All monetary amounts are stored as integer cents.
 
-Add your Gemini API key to `server/.env`:
+The Ledger shows pending debts and separate legacy wallet payment history.
+Only an IOU's creditor can confirm receipt; confirmation does not transfer funds.
+An IOU-backed chore cannot also be charged through the legacy wallet endpoint.
 
+**Venmo is a manual handoff, not an integrated payment API.** Save your Venmo
+username in the Ledger so debtors can open your profile with payment context.
+They must review and send the payment in Venmo, and you must confirm receipt in
+the Ledger. Opening the link does not verify or settle a payment automatically.
+There is no Venmo OAuth, webhook, or automatic transfer verification.
+
+## Gemini and password recovery
+
+Set `GEMINI_API_KEY` in `client/.env` to enable price estimates, chore suggestions,
+and fairness analysis. `GEMINI_MODEL` overrides the model; select a model
+available to your Google project. The configured default is `gemini-3.8-flash`;
+its live availability must be checked with your provider credentials.
+
+AI requests require explicit user consent before sending chore context to Google.
+Manual pricing and chore management work without Gemini. Provider requests time
+out after 30 seconds; configuration, provider, and invalid-output errors are
+shown rather than replaced with invented estimates.
+
+Password recovery requires the `SMTP_*` settings and `CLIENT_ORIGIN`.
+See [client/README.md](client/README.md) for API contracts, consent details, TLS,
+and configuration instructions.
+
+## Validation
+
+```bash
+npm run test:unit
+npm test
+npm run build
 ```
-GEMINI_API_KEY=your-api-key-here
-```
 
-## Demo Credentials
-
-Seed data creates two users:
-
-| Email | Password |
-|-------|----------|
-| alice@example.com | password123 |
-| bob@example.com | password123 |
-
-## API Endpoints
-
-### Auth
-- `POST /api/auth/register` — Register new user
-- `POST /api/auth/login` — Login and receive JWT
-- `GET /api/auth/me` — Get current user profile
-
-### Chores
-- `GET /api/chores` — List all chores
-- `POST /api/chores` — Create a chore
-- `PUT /api/chores/:id` — Update a chore
-- `PATCH /api/chores/:id/complete` — Mark chore as complete (creates ledger entry)
-- `DELETE /api/chores/:id` — Delete a chore
-
-### Ledger
-- `GET /api/ledger` — Get all transactions for current user
-- `GET /api/ledger/summary` — Get IOU summary (owed/owing breakdown)
-- `POST /api/ledger/iou` — Create manual IOU entry
-- `PATCH /api/ledger/:id/paid` — Mark transaction as paid
-
-### AI
-- `POST /api/ai/suggest-chores` — Get AI chore suggestions
-- `POST /api/ai/fair-split` — Get fairness analysis
-
-### Reminders
-- `GET /api/reminders` — Get payment reminders
-- `POST /api/reminders` — Create a reminder
-- `POST /api/reminders/send-due` — Process due reminders
-
-## Data Integrity
-
-- All monetary values are stored as **integer cents** (not floats) to prevent rounding errors
-- Database constraints ensure `from_user != to_user` in ledger transactions
-- Atomic transactions for chore completion + ledger entry creation
-- Foreign key constraints with proper cascade behavior
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Vue 3, Vite, Pinia, Tailwind CSS, Vue Router |
-| Backend | Express.js, Node.js |
-| Database | PostgreSQL 16, Knex.js |
-| Auth | JWT, bcrypt |
-| AI | Google Gemini API |
-| Security | Helmet, CORS, Rate Limiting |
+`npm test` requires PostgreSQL. Local test defaults target a separate
+`roommate_test_db`; the runner creates it and initializes its schema. Override
+`TEST_DATABASE_URL` for another disposable database containing a standalone
+`test` segment in its name. Tests refuse to target the configured development
+database. Integration fixtures exercise actual SQL transactions and rollback.
+Gemini tests use controlled provider responses, not live API calls, and Venmo
+tests do not move real money.

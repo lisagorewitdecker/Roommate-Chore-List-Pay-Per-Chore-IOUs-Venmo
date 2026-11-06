@@ -2,12 +2,40 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const net = require('node:net');
 const path = require('node:path');
+const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs');
+const os = require('node:os');
 const test = require('node:test');
 const { gzipSync } = require('node:zlib');
 const jwt = require('jsonwebtoken');
 const { createApp } = require('../server.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
+
+test('serves the built frontend and history routes without masking API or asset errors', async t => {
+  const distPath = mkdtempSync(path.join(os.tmpdir(), 'roommate-frontend-test-'));
+  t.after(() => rmSync(distPath, { recursive: true, force: true }));
+  mkdirSync(path.join(distPath, 'assets'));
+  writeFileSync(path.join(distPath, 'index.html'), '<!doctype html><div id="app">Frontend</div>');
+  writeFileSync(path.join(distPath, 'assets', 'app.js'), 'console.log("frontend");');
+  const server = await listen(createApp({ pool: {}, distPath }));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  for (const route of ['/', '/ledger', '/reset-password?token=example']) {
+    const response = await fetch(`${baseUrl}${route}`, { headers: { Accept: 'text/html' } });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /text\/html/);
+    assert.match(await response.text(), /id="app"/);
+  }
+  const asset = await fetch(`${baseUrl}/assets/app.js`);
+  assert.equal(asset.status, 200);
+  assert.match(await asset.text(), /console.log/);
+  const missingAsset = await fetch(`${baseUrl}/assets/missing.js`);
+  assert.equal(missingAsset.status, 404);
+  const apiError = await fetch(`${baseUrl}/api/unknown`, { headers: { Accept: 'text/html' } });
+  assert.equal(apiError.status, 404);
+  assert.deepEqual(await apiError.json(), { error: 'API route not found' });
+});
 
 async function withClientOrigin(origin, action) {
   const hadClientOrigin = Object.hasOwn(process.env, 'CLIENT_ORIGIN');

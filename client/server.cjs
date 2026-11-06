@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('node:path');
 const cors = require('cors');
 const { rateLimit } = require('express-rate-limit');
 const rateLimit = require('express-rate-limit');
@@ -18,7 +19,8 @@ function createApp({
   pool: paymentPool = pool,
   aiClientFactory,
   sendPasswordResetEmail,
-  passwordResetEmailConfigured
+  passwordResetEmailConfigured,
+  distPath = path.join(__dirname, 'dist')
 } = {}) {
   const app = express();
   const auth = createAuthMiddleware(paymentPool);
@@ -34,6 +36,10 @@ function createApp({
     legacyHeaders: false
     max: 100
   }));
+  const pageLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200
+  });
   app.use(express.json({ limit: '16kb' }));
   app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool, {
     sendPasswordResetEmail,
@@ -63,6 +69,12 @@ function createApp({
   app.post('/api/ai/fair-split', auth, createAiFairnessController(paymentPool, aiClientFactory));
   app.post('/api/ai/suggest-chores', auth, createAiSuggestionsController(paymentPool, aiClientFactory));
   app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+  app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found' }));
+  app.use(express.static(distPath));
+  app.get('*', pageLimiter, (req, res, next) => {
+    if (path.extname(req.path) || !req.accepts('html')) return next();
+    return res.sendFile(path.join(distPath, 'index.html'));
+  });
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
     return res.status(400).json({ error: 'Invalid request body' });

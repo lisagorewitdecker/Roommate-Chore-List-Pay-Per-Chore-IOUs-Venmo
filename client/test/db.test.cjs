@@ -26,6 +26,7 @@ function runDatabaseScript(script, { env = {}, dotenv = '', moduleEnv } = {}) {
   const childEnv = { ...process.env };
   delete childEnv.DATABASE_URL;
   delete childEnv.NODE_ENV;
+  childEnv.DATABASE_CA_CERT = '';
   Object.assign(childEnv, env);
   childEnv.NODE_PATH = path.resolve(__dirname, '../node_modules');
   childEnv.TEST_DATABASE_MODULE = modulePath;
@@ -72,12 +73,19 @@ test('configures the development pool without SSL and applies pool limits', () =
   assert.equal(options.connectionTimeoutMillis, 2000);
 });
 
-test('enables the configured SSL options in production', () => {
+test('verifies database certificates in production', () => {
   const options = readPoolOptions({
     env: { NODE_ENV: 'production', DATABASE_URL: 'postgres://prod.example/app' }
   });
 
-  assert.deepEqual(options.ssl, { rejectUnauthorized: false });
+  assert.deepEqual(options.ssl, { rejectUnauthorized: true });
+});
+
+test('uses the configured CA certificate in production', () => {
+  const options = readPoolOptions({
+    env: { NODE_ENV: 'production', DATABASE_CA_CERT: 'certificate\\nline-two' }
+  });
+  assert.deepEqual(options.ssl, { rejectUnauthorized: true, ca: 'certificate\nline-two' });
 });
 
 test('loads DATABASE_URL and NODE_ENV from the module .env outside the working directory', () => {
@@ -87,7 +95,7 @@ test('loads DATABASE_URL and NODE_ENV from the module .env outside the working d
   });
 
   assert.equal(options.connectionString, 'postgres://module.example/app');
-  assert.deepEqual(options.ssl, { rejectUnauthorized: false });
+  assert.deepEqual(options.ssl, { rejectUnauthorized: true });
 });
 
 test('keeps existing environment variables ahead of .env values', () => {
