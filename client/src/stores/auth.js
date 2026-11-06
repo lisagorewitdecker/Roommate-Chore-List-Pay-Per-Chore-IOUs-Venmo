@@ -13,6 +13,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!token.value);
 
+  function isAuthenticationError(err) {
+    return err.response?.status === 401 ||
+      (err.response?.status === 403 && err.response?.data?.error === 'Invalid or expired token');
+  }
+
   async function login(email, password) {
     loading.value = true;
     error.value = null;
@@ -45,7 +50,11 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       // Fetch full profile to get the household invite code
-      await fetchMe();
+      try {
+        await fetchMe();
+      } catch (err) {
+        if (isAuthenticationError(err)) throw err;
+      }
       return data;
     } catch (err) {
       error.value = err.response?.data?.error || 'Registration failed';
@@ -62,7 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('user', JSON.stringify(data.user));
       return data;
     } catch (err) {
-      logout();
+      if (isAuthenticationError(err)) logout();
       throw err;
     }
   }
