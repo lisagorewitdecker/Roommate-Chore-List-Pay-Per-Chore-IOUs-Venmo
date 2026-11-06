@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.1",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -26,7 +26,12 @@
   "devDependencies": {
     "nodemon": "^3.1.0"
   },
+  "overrides": {
+    "nodemon": {
+      "minimatch": "^11.0.5"
+    }
+  },
   "allowScripts": {
-    "bcrypt@5.1.1": true
+    "bcrypt@6.0.0": true
   }
 }
