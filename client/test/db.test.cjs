@@ -26,7 +26,7 @@ function runDatabaseScript(script, { env = {}, dotenv = '', moduleEnv } = {}) {
   const childEnv = { ...process.env };
   delete childEnv.DATABASE_URL;
   delete childEnv.NODE_ENV;
-  delete childEnv.DATABASE_CA_CERT;
+  childEnv.DATABASE_CA_CERT = '';
   Object.assign(childEnv, env);
   childEnv.NODE_PATH = path.resolve(__dirname, '../node_modules');
   childEnv.TEST_DATABASE_MODULE = modulePath;
