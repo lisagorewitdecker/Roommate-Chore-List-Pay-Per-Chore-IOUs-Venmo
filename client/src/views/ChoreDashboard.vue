@@ -55,13 +55,22 @@
 
         <div class="mt-5 border-t pt-3 flex items-center justify-end gap-2">
           <button
-            v-if="chore.status === 'open'"
+            v-if="chore.status === 'open' && !chore.assigned_to && chore.created_by !== authStore.user?.id"
             type="button"
             :disabled="store.loading"
-            @click="runChoreAction(() => store.updateStatus(chore.id, 'completed'))"
-            class="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded font-medium disabled:opacity-50"
+            @click="runChoreAction(() => store.claimChore(chore.id))"
+            class="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium disabled:opacity-50"
           >
-            Mark Complete
+            Pick up
+          </button>
+          <button
+            v-if="chore.status === 'open' && chore.assigned_to?.id === authStore.user?.id"
+            type="button"
+            :disabled="store.loading"
+            @click="runChoreAction(() => store.completeChore(chore.id))"
+            class="text-xs px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded font-medium disabled:opacity-50"
+          >
+            Complete
           </button>
           <button
             v-if="chore.status === 'completed' && chore.settlement_type !== 'household_iou'"
@@ -184,9 +193,11 @@
 
 <script setup>
 import { onMounted, ref } from 'vue';
+import { useAuthStore } from '../stores/auth.js';
 import { useChoreStore } from '../stores/choreStore.js';
 import api from '../utils/api.js';
 
+const authStore = useAuthStore();
 const store = useChoreStore();
 const showCreateModal = ref(false);
 const aiLoading = ref(false);

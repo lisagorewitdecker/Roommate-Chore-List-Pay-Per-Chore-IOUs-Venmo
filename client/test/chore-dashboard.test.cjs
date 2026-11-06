@@ -17,6 +17,8 @@ function loadComponent(vue) {
   const componentSource = compiled
     .replace(/import\s+\{([\s\S]*?)\}\s+from\s+['"]vue['"];?/g, (_, bindings) =>
       `const {${bindings.replace(/\s+as\s+/g, ':')}} = global.__choreDashboardVue;`)
+    .replace(/import\s+\{\s*useAuthStore\s*\}\s+from\s+['"][^'"]+['"];?/g,
+      'const { useAuthStore } = global.__choreDashboardModules;')
     .replace(/import\s+\{\s*useChoreStore\s*\}\s+from\s+['"][^'"]+['"];?/g,
       'const { useChoreStore } = global.__choreDashboardModules;')
     .replace(/import\s+api\s+from\s+['"][^'"]+['"];?/g,
@@ -76,6 +78,13 @@ function findButton(root, label) {
   return button;
 }
 
+function findButtons(root, label) {
+  return (root.children || []).flatMap(node => [
+    ...(node.type === 'button' && textContent(node).trim() === label ? [node] : []),
+    ...findButtons(node, label)
+  ]);
+}
+
 function findInput(root, id) {
   const input = walk(root, node => node.props?.id === id);
   assert.ok(input, `Expected input "${id}"`);
@@ -85,7 +94,8 @@ function findInput(root, id) {
 async function mountDashboard({ chores = [], fetchError, fetchErrors = [], createError, apiPost } = {}) {
   const vue = await import('vue');
   const state = vue.reactive({ chores, loading: false, error: null });
-  const calls = { fetch: 0, create: [], status: [], pay: [] };
+  const authState = vue.reactive({ user: { id: 'current-user' } });
+  const calls = { fetch: 0, create: [], claim: [], complete: [], pay: [] };
   state.fetchChores = async () => {
     calls.fetch += 1;
     if (fetchErrors[calls.fetch - 1]) throw fetchErrors[calls.fetch - 1];
@@ -97,13 +107,19 @@ async function mountDashboard({ chores = [], fetchError, fetchErrors = [], creat
     if (createError) throw createError;
     state.chores.unshift({ id: 'new-chore', status: 'open', ...payload });
   };
-  state.updateStatus = async (id, status) => {
-    calls.status.push([id, status]);
+  state.claimChore = async id => {
+    calls.claim.push(id);
     const chore = state.chores.find(item => item.id === id);
-    if (chore) chore.status = status;
+    if (chore) chore.assigned_to = { id: authState.user.id, name: 'Current user' };
+  };
+  state.completeChore = async id => {
+    calls.complete.push(id);
+    const chore = state.chores.find(item => item.id === id);
+    if (chore) chore.status = 'completed';
   };
   state.payChore = async id => calls.pay.push(id);
   global.__choreDashboardModules = {
+    useAuthStore: () => authState,
     useChoreStore: () => state,
     api: { post: (...args) => apiPost(...args) }
   };
@@ -127,10 +143,13 @@ function input(inputNode, value, vue) {
   return vue.nextTick();
 }
 
-test('fetches chores on mount and presents status-specific board actions', async () => {
+test('fetches chores and offers pickup and completion only to eligible roommates', async () => {
   const { root, calls, vue } = await mountDashboard({
     chores: [
-      { id: 'open', title: 'Vacuum', price_cents: 500, status: 'open' },
+      { id: 'available', title: 'Vacuum', price_cents: 500, status: 'open', assigned_to: null, created_by: 'another-user' },
+      { id: 'own', title: 'Trash', price_cents: 300, status: 'open', assigned_to: null, created_by: 'current-user' },
+      { id: 'other-assignee', title: 'Mop', price_cents: 400, status: 'open', assigned_to: { id: 'another-user' } },
+      { id: 'mine', title: 'Dishes', price_cents: 600, status: 'open', assigned_to: { id: 'current-user' } },
       { id: 'completed', title: 'Dishes', price_cents: 750, status: 'completed' },
       { id: 'paid', title: 'Laundry', price_cents: 1000, status: 'verified_paid' }
     ]
@@ -139,10 +158,16 @@ test('fetches chores on mount and presents status-specific board actions', async
   assert.equal(calls.fetch, 1);
   assert.match(textContent(root), /Roommate Chore Bounty/);
   assert.match(textContent(root), /\$5\.00/);
-  assert.ok(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Mark Complete'));
+  assert.equal(findButtons(root, 'Pick up').length, 1);
+  assert.equal(findButtons(root, 'Complete').length, 1);
+  assert.equal(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Mark Complete'), null);
   assert.ok(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Settle & Pay $7.50'));
   assert.equal(walk(root, node => node.type === 'button' && textContent(node).trim() === 'Settle & Pay $10.00'), null);
-  await click(findButton(root, 'Mark Complete'), vue);
+
+  await click(findButton(root, 'Complete'), vue);
+  assert.deepEqual(calls.complete, ['mine']);
+  await click(findButton(root, 'Pick up'), vue);
+  assert.deepEqual(calls.claim, ['available']);
 });
 
 test('AI estimate updates the reward and create submits cents then resets the modal', async () => {
@@ -219,26 +244,26 @@ test('creation failures keep the modal and entered form values available for ret
   assert.match(textContent(root), /Chore service unavailable/);
 });
 
-test('payment and status actions call the store and action failures are shown', async () => {
+test('payment and completion actions call the store and action failures are shown', async () => {
   const { root, calls, vue } = await mountDashboard({
     chores: [
-      { id: 'open', title: 'Vacuum', price_cents: 500, status: 'open' },
+      { id: 'open', title: 'Vacuum', price_cents: 500, status: 'open', assigned_to: { id: 'current-user' } },
       { id: 'completed', title: 'Dishes', price_cents: 750, status: 'completed' }
     ]
   });
 
-  await click(findButton(root, 'Mark Complete'), vue);
+  await click(findButton(root, 'Complete'), vue);
   await click(findButton(root, 'Settle & Pay $7.50'), vue);
-  assert.deepEqual(calls.status, [['open', 'completed']]);
+  assert.deepEqual(calls.complete, ['open']);
   assert.deepEqual(calls.pay, ['completed']);
 
   const failed = await mountDashboard({
-    chores: [{ id: 'open', title: 'Vacuum', price_cents: 500, status: 'open' }],
+    chores: [{ id: 'open', title: 'Vacuum', price_cents: 500, status: 'open', assigned_to: { id: 'current-user' } }],
     apiPost: async () => ({ data: {} })
   });
-  failed.state.updateStatus = async () => { throw new Error('Status update rejected'); };
-  await click(findButton(failed.root, 'Mark Complete'), failed.vue);
-  assert.match(textContent(failed.root), /Status update rejected/);
+  failed.state.completeChore = async () => { throw new Error('Completion rejected'); };
+  await click(findButton(failed.root, 'Complete'), failed.vue);
+  assert.match(textContent(failed.root), /Completion rejected/);
 });
 
 test('fetch failures render a retryable error instead of an unhandled rejection', async () => {
