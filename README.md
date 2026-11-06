@@ -27,7 +27,7 @@ Vue 3 Client (Vite, Pinia, Tailwind)
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js matching `^22.22.2 || ^24.15.0 || >=26.0.0` for the full app
 - Docker & Docker Compose
 - (Optional) Google Gemini API key for AI features
 
