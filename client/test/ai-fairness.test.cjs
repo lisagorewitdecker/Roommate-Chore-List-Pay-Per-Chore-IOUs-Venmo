@@ -26,6 +26,7 @@ async function requestFairness({
   modelText = '{"fairness_score":7,"observations":["Roommate 1 has more assigned chores."],"recommendations":["Rotate future assignments."]}',
   providerError,
   apiKey = 'test-gemini-key',
+  geminiConsent = true,
   authorization = true,
   databaseError
 } = {}) {
@@ -38,7 +39,8 @@ async function requestFairness({
   const pool = {
     async query(sql, values) {
       queries.push({ sql, values });
-      if (databaseError) throw databaseError;
+      if (databaseError && !sql.includes('SELECT session_version')) throw databaseError;
+      if (sql.includes('SELECT session_version')) return { rows: [{ session_version: 0 }] };
       if (sql.includes('SELECT household_id FROM users')) {
         return { rows: [{ household_id: householdId }] };
       }
@@ -68,7 +70,9 @@ async function requestFairness({
     const token = jwt.sign({ id: 'test-user', household_id: 'stale-household' }, secret);
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/ai/fair-split`, {
       method: 'POST',
+      body: JSON.stringify({ geminiConsent }),
       headers: {
+        'Content-Type': 'application/json',
         ...(authorization ? { Authorization: `Bearer ${token}` } : {})
       }
     });
@@ -89,10 +93,10 @@ test('analyzes anonymized household chore counts and values', async () => {
       recommendations: ['Rotate future assignments.']
     }
   });
-  assert.equal(queries.length, 2);
-  assert.deepEqual(queries[0].values, ['test-user']);
-  assert.deepEqual(queries[1].values, ['household-a']);
-  assert.match(queries[1].sql, /u\.household_id = \$1/);
+  assert.equal(queries.length, 3);
+  assert.deepEqual(queries[1].values, ['test-user']);
+  assert.deepEqual(queries[2].values, ['household-a']);
+  assert.match(queries[2].sql, /u\.household_id = \$1/);
   const prompt = modelRequests[0].contents[0].parts[0].text;
   assert.match(prompt, /Roommate 1: 2 assigned chores, total value 5000 cents/);
   assert.match(prompt, /Roommate 2: 1 assigned chores, total value 2500 cents/);
@@ -108,12 +112,22 @@ test('requires authentication before reading household data', async () => {
   assert.equal(modelRequests.length, 0);
 });
 
+test('requires explicit consent before reading household data or calling Gemini', async () => {
+  const { response, body, queries, modelRequests } = await requestFairness({ geminiConsent: false });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(body, { error: 'Consent to share chore data with Gemini is required' });
+  assert.equal(queries.length, 1);
+  assert.match(queries[0].sql, /SELECT session_version/);
+  assert.equal(modelRequests.length, 0);
+});
+
 test('uses current database membership and rejects accounts without a household', async () => {
   const { response, body, queries, modelRequests } = await requestFairness({ householdId: null });
 
   assert.equal(response.status, 403);
   assert.deepEqual(body, { error: 'Your account is not part of a household' });
-  assert.equal(queries.length, 1);
+  assert.equal(queries.length, 2);
   assert.equal(modelRequests.length, 0);
 });
 

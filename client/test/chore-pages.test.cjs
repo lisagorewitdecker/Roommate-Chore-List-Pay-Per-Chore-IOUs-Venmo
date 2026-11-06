@@ -145,6 +145,12 @@ async function input(inputNode, value, vue) {
   await vue.nextTick();
 }
 
+async function setGeminiConsent(root, vue, checked = true) {
+  const checkbox = findInput(root, node => node.props.type === 'checkbox');
+  checkbox.props.onChange({ target: { checked } });
+  await vue.nextTick();
+}
+
 test('AI estimate page sends chore details and displays the returned cents estimate', async () => {
   const requests = [];
   const { root, vue } = await mountPage('ai', {
@@ -156,9 +162,17 @@ test('AI estimate page sends chore details and displays the returned cents estim
 
   await input(findInput(root, node => node.props.id === 'estimate-title'), '  Clean the kitchen  ', vue);
   await input(findInput(root, node => node.props.id === 'estimate-description'), 'Wipe counters', vue);
+  const estimateButton = findButton(root, '🤖 Estimate Fair Price');
+  assert.equal(estimateButton.props.disabled, true);
+  await setGeminiConsent(root, vue);
+  assert.equal(estimateButton.props.disabled, false);
   await click(findButton(root, '🤖 Estimate Fair Price'), vue);
 
-  assert.deepEqual(requests, [['/ai/estimate-price', { title: 'Clean the kitchen', description: 'Wipe counters' }]]);
+  assert.deepEqual(requests, [['/ai/estimate-price', {
+    title: 'Clean the kitchen',
+    description: 'Wipe counters',
+    geminiConsent: true
+  }]]);
   assert.match(textContent(root), /\$12\.50/);
   assert.match(textContent(root), /Several steps/);
 });
@@ -180,9 +194,10 @@ test('fairness page requests and displays the household analysis', async () => {
     }
   });
 
+  await setGeminiConsent(root, vue);
   await click(findButton(root, '🤖 Analyze Fairness'), vue);
 
-  assert.deepEqual(requests, [['/ai/fair-split']]);
+  assert.deepEqual(requests, [['/ai/fair-split', { geminiConsent: true }]]);
   assert.match(textContent(root), /7\/10/);
   assert.match(textContent(root), /Roommate 1 has more assigned chores/);
   assert.match(textContent(root), /Rotate future assignments/);
@@ -203,6 +218,7 @@ test('fairness page clears stale analysis and shows an actionable API error', as
     }
   });
 
+  await setGeminiConsent(root, vue);
   await click(findButton(root, '🤖 Analyze Fairness'), vue);
   assert.match(textContent(root), /8\/10/);
   await click(findButton(root, '🤖 Analyze Fairness'), vue);
@@ -230,9 +246,10 @@ test('AI suggestions page requests and displays chores and adds a suggestion', a
     }
   });
 
+  await setGeminiConsent(root, vue);
   await click(findButton(root, '🤖 Get AI Suggestions'), vue);
 
-  assert.deepEqual(requests, [['/ai/suggest-chores']]);
+  assert.deepEqual(requests, [['/ai/suggest-chores', { geminiConsent: true }]]);
   assert.match(textContent(root), /Clean shared counters/);
   assert.match(textContent(root), /Weekly/);
   assert.match(textContent(root), /Suggested frequency is informational/i);
@@ -263,6 +280,7 @@ test('AI suggestions page clears stale suggestions and reports add failures', as
     }
   });
 
+  await setGeminiConsent(root, vue);
   await click(findButton(root, '🤖 Get AI Suggestions'), vue);
   await click(findButton(root, 'Add Chore'), vue);
   assert.match(textContent(root), /Unable to create chore right now/);

@@ -7,10 +7,14 @@ export const useSupplyStore = defineStore('supplies', () => {
   const members = ref([]);
   const loading = ref(false);
   const error = ref(null);
-  let sessionVersion = 0;
+  let session = 0;
+
+  function isCurrentSession(requestSession) {
+    return requestSession === session;
+  }
 
   function reset() {
-    sessionVersion += 1;
+    session += 1;
     supplies.value = [];
     members.value = [];
     loading.value = false;
@@ -18,74 +22,78 @@ export const useSupplyStore = defineStore('supplies', () => {
   }
 
   async function fetchSupplies() {
-    const requestSession = sessionVersion;
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.get('/supplies');
-      if (requestSession === sessionVersion) {
+      if (isCurrentSession(requestSession)) {
         supplies.value = Array.isArray(data?.supplies) ? data.supplies : [];
         members.value = Array.isArray(data?.members) ? data.members : [];
       }
     } catch (err) {
-      if (requestSession === sessionVersion) {
+      if (isCurrentSession(requestSession)) {
         error.value = err.response?.data?.error || 'Failed to load the cleaning supplies list';
       }
       throw err;
     } finally {
-      if (requestSession === sessionVersion) loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function createSupply(supplyData) {
-    const requestSession = sessionVersion;
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.post('/supplies', supplyData);
-      if (requestSession === sessionVersion) supplies.value.push(data.supply);
+      if (isCurrentSession(requestSession)) supplies.value.push(data.supply);
       return data.supply;
     } catch (err) {
-      if (requestSession === sessionVersion) error.value = err.response?.data?.error || 'Failed to add cleaning supply';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to add cleaning supply';
+      }
       throw err;
     } finally {
-      if (requestSession === sessionVersion) loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function updateSupply(id, changes) {
-    const requestSession = sessionVersion;
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       const { data } = await api.patch(`/supplies/${id}`, changes);
       const index = supplies.value.findIndex(supply => supply.id === id);
-      if (requestSession === sessionVersion && index !== -1) supplies.value[index] = data.supply;
+      if (isCurrentSession(requestSession) && index !== -1) supplies.value[index] = data.supply;
       return data.supply;
     } catch (err) {
-      if (requestSession === sessionVersion) error.value = err.response?.data?.error || 'Failed to update supply';
+      if (isCurrentSession(requestSession)) {
+        error.value = err.response?.data?.error || 'Failed to update supply';
+      }
       throw err;
     } finally {
-      if (requestSession === sessionVersion) loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 
   async function markPurchased(id, actualPriceCents) {
-    const requestSession = sessionVersion;
+    const requestSession = session;
     loading.value = true;
     error.value = null;
     try {
       await api.post(`/supplies/${id}/purchase`, { actual_price_cents: actualPriceCents });
-      if (requestSession === sessionVersion) {
+      if (isCurrentSession(requestSession)) {
         supplies.value = supplies.value.filter(supply => supply.id !== id);
       }
     } catch (err) {
-      if (requestSession === sessionVersion) {
+      if (isCurrentSession(requestSession)) {
         error.value = err.response?.data?.error || 'Failed to mark supply as purchased';
       }
       throw err;
     } finally {
-      if (requestSession === sessionVersion) loading.value = false;
+      if (isCurrentSession(requestSession)) loading.value = false;
     }
   }
 

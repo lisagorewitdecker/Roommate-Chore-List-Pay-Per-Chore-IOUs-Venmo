@@ -16,12 +16,17 @@ CREATE TABLE users (
                        name VARCHAR(100) NOT NULL,
                        email VARCHAR(255) NOT NULL,
                        password_hash VARCHAR(255) NOT NULL,
+                       session_version INT NOT NULL DEFAULT 0,
+                       password_reset_token_hash CHAR(64),
+                       password_reset_token_expires_at TIMESTAMP WITH TIME ZONE,
                        balance_cents INT NOT NULL DEFAULT 0, -- Stored in cents ($10.50 = 1050)
                        venmo_username VARCHAR(30) CHECK (venmo_username IS NULL OR venmo_username ~ '^[A-Za-z0-9_-]{1,30}$'),
                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE UNIQUE INDEX users_email_lower_idx ON users (LOWER(email));
+CREATE INDEX idx_users_password_reset_token_hash
+  ON users(password_reset_token_hash) WHERE password_reset_token_hash IS NOT NULL;
 
 -- Chores (Full CRUD target)
 CREATE TYPE chore_status AS ENUM ('open', 'in_progress', 'completed', 'verified_paid');
