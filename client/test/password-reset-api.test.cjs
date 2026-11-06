@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { createHash, randomUUID } = require('node:crypto');
 const test = require('node:test');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const { createApp } = require('../server.cjs');
 
 const secret = 'password-reset-api-test-secret';
@@ -36,7 +37,12 @@ class PasswordResetMemoryPool {
       user.password_hash = passwordHash;
       user.password_reset_token_hash = null;
       user.password_reset_token_expires_at = null;
+      user.session_version = (user.session_version ?? 0) + 1;
       return { rows: [{ id: user.id }] };
+    }
+    if (query.startsWith('select session_version from users')) {
+      const user = this.users.find(row => row.id === values[0]);
+      return { rows: user ? [{ session_version: user.session_version ?? 0 }] : [] };
     }
     if (query.startsWith('select id, name, email, password_hash')) {
       const email = values[0].toLowerCase();
@@ -93,6 +99,7 @@ function makeUser(overrides = {}) {
     password_hash: bcrypt.hashSync('old-password', 4),
     household_id: randomUUID(),
     balance_cents: 0,
+    session_version: 0,
     password_reset_token_hash: null,
     password_reset_token_expires_at: null,
     ...overrides
@@ -153,6 +160,7 @@ test('password reset validates tokens and passwords, consumes the token, and per
   });
   const pool = new PasswordResetMemoryPool([user, expiredUser]);
   let resetUrl;
+  const oldSessionToken = jwt.sign({ id: user.id }, secret);
 
   await withApi(pool, async baseUrl => {
     await post(baseUrl, '/api/auth/password-reset/request', { email: user.email });
@@ -188,7 +196,14 @@ test('password reset validates tokens and passwords, consumes the token, and per
     assert.equal(completed.body.message, 'Password has been reset. You can now sign in.');
     assert.equal(user.password_reset_token_hash, null);
     assert.equal(user.password_reset_token_expires_at, null);
+    assert.equal(user.session_version, 1);
     assert.equal(await bcrypt.compare('new-password', user.password_hash), true);
+
+    const oldSession = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Authorization: ['Bear', 'er ', oldSessionToken].join('') }
+    });
+    assert.equal(oldSession.status, 403);
+    assert.deepEqual(await oldSession.json(), { error: 'Invalid or expired token' });
 
     const reused = await post(baseUrl, '/api/auth/password-reset/complete', { token, password: 'another-password' });
     assert.equal(reused.response.status, 400);
@@ -197,6 +212,7 @@ test('password reset validates tokens and passwords, consumes the token, and per
     assert.equal(oldLogin.response.status, 401);
     const newLogin = await post(baseUrl, '/api/auth/login', { email: user.email, password: 'new-password' });
     assert.equal(newLogin.response.status, 200);
+    assert.equal(jwt.decode(newLogin.body.token).session_version, 1);
   }, {
     sendPasswordResetEmail: async email => { resetUrl = email.resetUrl; },
     passwordResetEmailConfigured: () => true

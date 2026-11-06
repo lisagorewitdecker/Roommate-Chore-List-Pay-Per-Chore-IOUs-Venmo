@@ -16,6 +16,7 @@ CREATE TABLE users (
                        name VARCHAR(100) NOT NULL,
                        email VARCHAR(255) NOT NULL,
                        password_hash VARCHAR(255) NOT NULL,
+                       session_version INT NOT NULL DEFAULT 0,
                        password_reset_token_hash CHAR(64),
                        password_reset_token_expires_at TIMESTAMP WITH TIME ZONE,
                        balance_cents INT NOT NULL DEFAULT 0, -- Stored in cents ($10.50 = 1050)

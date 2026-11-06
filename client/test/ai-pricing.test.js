@@ -48,6 +48,7 @@ async function requestEstimate({
   let generateContentCalls = 0;
   const requestedModels = [];
   const app = createApp({
+    pool: { query: async () => ({ rows: [{ session_version: 0 }] }) },
     aiClientFactory: () => ({
       models: {
         async generateContent(request) {

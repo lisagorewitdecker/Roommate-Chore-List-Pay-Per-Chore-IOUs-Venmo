@@ -42,7 +42,8 @@ async function requestSuggestions({
   const pool = {
     async query(sql, values) {
       queries.push({ sql, values });
-      if (databaseError) throw databaseError;
+      if (databaseError && !sql.includes('SELECT session_version')) throw databaseError;
+      if (sql.includes('SELECT session_version')) return { rows: [{ session_version: 0 }] };
       if (sql.includes('SELECT household_id FROM users')) {
         return { rows: [{ household_id: householdId }] };
       }
@@ -100,10 +101,10 @@ test('suggests chores from current household titles and anonymized workloads', a
       reason: 'Keeps shared surfaces hygienic.'
     }]
   });
-  assert.equal(queries.length, 3);
-  assert.deepEqual(queries[0].values, ['test-user']);
-  assert.deepEqual(queries[1].values, ['household-a', 20]);
-  assert.deepEqual(queries[2].values, ['household-a']);
+  assert.equal(queries.length, 4);
+  assert.deepEqual(queries[1].values, ['test-user']);
+  assert.deepEqual(queries[2].values, ['household-a', 20]);
+  assert.deepEqual(queries[3].values, ['household-a']);
   const prompt = modelRequests[0].contents[0].parts[0].text;
   assert.match(prompt, /Wash shared dishes/);
   assert.match(prompt, /Take out household recycling/);
@@ -168,7 +169,8 @@ test('requires explicit consent before reading household data or calling Gemini'
 
   assert.equal(response.status, 400);
   assert.deepEqual(body, { error: 'Consent to share chore data with Gemini is required' });
-  assert.equal(queries.length, 0);
+  assert.equal(queries.length, 1);
+  assert.match(queries[0].sql, /SELECT session_version/);
   assert.equal(modelRequests.length, 0);
 });
 
@@ -177,7 +179,7 @@ test('uses current database membership and rejects accounts without a household'
 
   assert.equal(response.status, 403);
   assert.deepEqual(body, { error: 'Your account is not part of a household' });
-  assert.equal(queries.length, 1);
+  assert.equal(queries.length, 2);
   assert.equal(modelRequests.length, 0);
 });
 

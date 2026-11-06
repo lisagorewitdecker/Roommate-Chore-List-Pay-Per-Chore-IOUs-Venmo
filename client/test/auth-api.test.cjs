@@ -84,6 +84,7 @@ class MemoryPool {
             password_hash,
             household_id,
             balance_cents: 0,
+            session_version: 0,
             created_at: new Date().toISOString()
           };
           transaction.users.push(user);
@@ -106,6 +107,10 @@ class MemoryPool {
       const email = values[0].toLowerCase();
       const user = this.users.find(row => row.email.toLowerCase() === email);
       return { rows: user ? [{ ...user }] : [] };
+    }
+    if (query.startsWith('select session_version from users')) {
+      const user = this.users.find(row => row.id === values[0]);
+      return { rows: user ? [{ session_version: user.session_version ?? 0 }] : [] };
     }
     if (query.startsWith('select u.id')) {
       if (this.failOnProfileQuery) throw new Error('injected profile query failure');
@@ -192,6 +197,7 @@ test('registers a user and creates a household in one transaction without exposi
       id: pool.users[0].id,
       email: 'alex@example.com',
       household_id: pool.households[0].id,
+      session_version: 0,
       iat: jwt.decode(body.token).iat,
       exp: jwt.decode(body.token).exp
     });
@@ -324,7 +330,8 @@ test('login uses a generic credential error and profile returns only safe user f
     email: 'alex@example.com',
     password_hash: await bcrypt.hash('correct-password', 4),
     household_id: household.id,
-    balance_cents: 1234
+    balance_cents: 1234,
+    session_version: 0
   };
   const pool = new MemoryPool({ users: [user], households: [household] });
 
@@ -407,14 +414,15 @@ test('profile rejects an invalid authenticated user and reports a missing profil
     const missingProfileResponse = await fetch(`${baseUrl}/api/auth/me`, {
       headers: { Authorization: `Bearer ${missingProfileToken}` }
     });
-    assert.equal(missingProfileResponse.status, 404);
-    assert.deepEqual(await missingProfileResponse.json(), { error: 'User profile not found' });
+    assert.equal(missingProfileResponse.status, 403);
+    assert.deepEqual(await missingProfileResponse.json(), { error: 'Invalid or expired token' });
   });
 });
 
 test('profile returns a safe server error when the user query fails', async () => {
-  const pool = new MemoryPool({ failOnProfileQuery: true });
-  const token = jwt.sign({ id: randomUUID() }, secret);
+  const user = { id: randomUUID(), session_version: 0 };
+  const pool = new MemoryPool({ users: [user], failOnProfileQuery: true });
+  const token = jwt.sign({ id: user.id }, secret);
 
   await withApi(pool, async baseUrl => {
     const response = await fetch(`${baseUrl}/api/auth/me`, {

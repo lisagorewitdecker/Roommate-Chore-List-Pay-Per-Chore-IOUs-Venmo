@@ -109,7 +109,8 @@ async function ensureTestDatabase(testDatabaseUrl, {
   migrationPath = path.join(__dirname, '../database/migrations/001_cleaning_supplies.sql'),
   iouMigrationPath = path.join(__dirname, '../database/migrations/002_ious.sql'),
   sharedExpensesMigrationPath = path.join(__dirname, '../database/migrations/003_shared_expenses.sql'),
-  passwordResetMigrationPath = path.join(__dirname, '../database/migrations/004_password_reset.sql')
+  passwordResetMigrationPath = path.join(__dirname, '../database/migrations/004_password_reset.sql'),
+  sessionVersionMigrationPath = path.join(__dirname, '../database/migrations/005_session_version.sql')
 } = {}) {
   const { url: targetUrl, databaseName } = validateTestDatabaseUrl(testDatabaseUrl);
   const adminUrl = new URL(targetUrl.toString());
@@ -164,6 +165,7 @@ async function ensureTestDatabase(testDatabaseUrl, {
     await testClient.query(readFileSync(iouMigrationPath, 'utf8'));
     await testClient.query(readFileSync(sharedExpensesMigrationPath, 'utf8'));
     await testClient.query(readFileSync(passwordResetMigrationPath, 'utf8'));
+    await testClient.query(readFileSync(sessionVersionMigrationPath, 'utf8'));
 
     await testClient.query('COMMIT');
     transactionStarted = false;

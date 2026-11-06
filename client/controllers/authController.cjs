@@ -16,7 +16,8 @@ function generateToken(user) {
   return jwt.sign({
     id: user.id,
     email: user.email,
-    household_id: user.household_id
+    household_id: user.household_id,
+    session_version: user.session_version ?? 0
   }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
@@ -118,7 +119,7 @@ function createAuthController(pool, {
       const userResult = await client.query(
         `INSERT INTO users (name, email, password_hash, household_id, balance_cents)
          VALUES ($1, $2, $3, $4, 0)
-         RETURNING id, name, email, household_id, balance_cents, created_at`,
+         RETURNING id, name, email, household_id, balance_cents, session_version, created_at`,
         [name, email, passwordHash, assignedHouseholdId]
       );
 
@@ -168,7 +169,7 @@ function createAuthController(pool, {
 
     try {
       const result = await pool.query(
-        `SELECT id, name, email, password_hash, household_id, balance_cents
+        `SELECT id, name, email, password_hash, household_id, balance_cents, session_version
          FROM users
          WHERE LOWER(email) = LOWER($1)`,
         [email]
@@ -263,7 +264,8 @@ function createAuthController(pool, {
         `UPDATE users
          SET password_hash = $1,
              password_reset_token_hash = NULL,
-             password_reset_token_expires_at = NULL
+             password_reset_token_expires_at = NULL,
+             session_version = session_version + 1
          WHERE password_reset_token_hash = $2
            AND password_reset_token_expires_at > NOW()
          RETURNING id`,

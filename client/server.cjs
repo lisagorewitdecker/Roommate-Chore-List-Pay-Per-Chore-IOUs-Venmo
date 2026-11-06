@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const pool = require('./db.cjs');
-const auth = require('./middleware/auth.js');
+const createAuthMiddleware = require('./middleware/auth.js');
 const { createAuthController } = require('./controllers/authController.cjs');
 const { createPaymentController } = require('./controllers/paymentController.cjs');
 const { createAiPricingController } = require('./controllers/aiPricingController.cjs');
@@ -19,6 +19,7 @@ function createApp({
   passwordResetEmailConfigured
 } = {}) {
   const app = express();
+  const auth = createAuthMiddleware(paymentPool);
   app.disable('x-powered-by');
   app.use(cors({
     origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
@@ -28,7 +29,7 @@ function createApp({
   app.use('/api/auth', createAuthRoutes(createAuthController(paymentPool, {
     sendPasswordResetEmail,
     passwordResetEmailConfigured
-  })));
+  }), auth));
   const choreController = createChoreController(paymentPool);
   app.get('/api/chores', auth, choreController.list);
   app.post('/api/chores', auth, choreController.create);
