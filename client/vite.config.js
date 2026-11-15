@@ -6,7 +6,7 @@ import vue from '@vitejs/plugin-vue';
 export default defineConfig({
   plugins: [vue()],
   css: {
-    postcss: fileURLToPath(new URL('./postcss.config.js', import.meta.url))
+    postcss: fileURLToPath(new URL('.', import.meta.url))
   },
   server: {
     port: 5173,
