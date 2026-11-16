@@ -8,6 +8,8 @@ cleaning supplies, shared expenses, and IOUs, with optional Gemini suggestions.
 The current frontend and matching API both live in `client/`. Root npm scripts
 delegate there. The older `server/src` implementation and Knex schema are not
 compatible with the current frontend; do not use them to run this application.
+For legacy server development, copy `server/.env.example` to `server/.env`
+before adding credentials; `.env` files are ignored by Git.
 
 Use Node.js matching `^22.22.2 || ^24.15.0 || >=26.0.0` and Docker Compose.
 From the repository root:
